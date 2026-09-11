@@ -1,0 +1,5 @@
+PLAN.md
+vendor/
+.env
+*.sqlite
+.phpunit.cache/
