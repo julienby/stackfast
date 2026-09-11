@@ -57,7 +57,8 @@
 ## Boucle d'amélioration (ce qui fait vivre ces fichiers)
 
 - **Tu proposes la Lesson, sans attendre que je la demande.** Chaque fois que je te corrige ou qu'une vérification échoue
-  sur une erreur évitable : en fin de tâche (`/retro`), propose en une ligne la règle qui l'aurait empêchée. Je valide, tu l'écris.
+  sur une erreur évitable, note-le. En fin de tâche, propose en une ligne la règle qui l'aurait empêchée et demande « ok ? ».
+  Je réponds oui ou non. `/retro` est le filet manuel : revue complète si tu as oublié ou en fin de session.
 - Format : `- YYYY-MM-DD — règle. (erreur observée : ...)`. Sans erreur observée, pas de règle.
 - Une Lesson qui revient sur 2 projets remonte ici et sort des locaux. Signale-le.
 - À chaque `/retro`, propose aussi une ligne à **élaguer** si elle n'a servi à rien.
