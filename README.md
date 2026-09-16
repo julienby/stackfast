@@ -47,4 +47,6 @@ INIT/instance/           gabarit d'un VPS (copié sans écraser)
 INIT/stacks/<stack>/     une stack (copiée en écrasant)
 DECISIONS.md             arbitrages du hub
 docs/PRD.md              le pourquoi de cette organisation
+docs/GETTING-STARTED.md  tester en local, sans VPS ni domaine
+docs/DEPLOY-VPS.md       déployer en prod (proxy en dehors du repo, config Caddy/nginx en référence)
 ```
