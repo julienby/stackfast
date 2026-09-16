@@ -10,3 +10,6 @@ Une ligne par arbitrage : date, choix, pourquoi, alternative écartée.
 - 2026-09-16 — Tests PHP CLI sans framework (`tests/*_test.php`, ok/FAIL, exit 1), une commande `bin/check` pour toutes les stacks. Écarté : PHPUnit (dépendance, config, pas lisible par tout le monde).
 - 2026-09-16 — Secrets dans `.env` gitignoré (une variable par app, préfixe `<SLUG>_`), passés par `env_file`. Écarté : valeurs par défaut dans compose.
 - 2026-09-16 — Apache tourne avec l'uid de l'hôte (`HOST_UID/HOST_GID`) : `data/` bind-monté reste lisible et éditable des deux côtés. Écarté : `chown www-data` / `chmod 777`.
+- 2026-09-16 — Chaque app expose `/api` et `/mcp` par défaut, scaffoldées même vides (200, liste vide). Agentic first : jamais à rajouter après coup. Écarté : les créer seulement quand l'app en a besoin.
+- 2026-09-16 — `/api` et `/mcp` répondent même vides plutôt que 404 : un client (humain ou agent) découvre toujours la surface, même sans endpoint déclaré. Écarté : 404 tant qu'aucun endpoint n'est enregistré.
+- 2026-09-16 — Un seul bearer token par app (`<SLUG>_API_TOKEN`, `.env`) protège `/api` et `/mcp` ensemble. Une app = un consommateur (l'app elle-même ou son agent), pas de raison de séparer. Écarté : un secret partagé au niveau instance ; deux tokens distincts par surface.

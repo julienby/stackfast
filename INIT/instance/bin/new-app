@@ -19,7 +19,13 @@ cp -R "$TEMPLATE" "$DEST"
 find "$DEST" -type f -exec sed -i "s/__SLUG__/$SLUG/g" {} +
 echo "créée : $DEST"
 
+ENV_VAR="$(echo "$SLUG" | tr 'a-z-' 'A-Z_')_API_TOKEN"
+TOKEN="$(openssl rand -hex 32)"
+
 cat <<PROXY
+
+Token /api + /mcp (bearer), à ajouter dans .env :
+$ENV_VAR=$TOKEN
 
 Sous-répertoire : rien à faire, l'app répond sur /$SLUG/ derrière le proxy de l'instance.
 Domaine dédié, bloc à ajouter (voir proxy/) :

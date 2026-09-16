@@ -7,12 +7,24 @@ define('APP', __DIR__);
 foreach ([dirname(__DIR__, 2), dirname(__DIR__, 3)] as $root) {
     if (is_file($root . '/stacks/php-htmx/lib/bootstrap.php')) {
         require_once $root . '/stacks/php-htmx/lib/bootstrap.php';
+        require_once $root . '/stacks/php-htmx/lib/mcp_api.php';
         break;
     }
 }
 require APP . '/lib/items.php';
+require APP . '/lib/api.php';
+require APP . '/lib/mcp.php';
 
-use function Stack\{csrf_check, csrf_token, method, path, render, session_start_app, url};
+use function Stack\{api_dispatch, bearer_check, csrf_check, csrf_token, mcp_dispatch, method, path, render, session_start_app, url};
+
+if (str_starts_with(path(), '/api')) {
+    bearer_check('__SLUG__');
+    api_dispatch(api_endpoints());
+}
+if (str_starts_with(path(), '/mcp')) {
+    bearer_check('__SLUG__');
+    mcp_dispatch('__SLUG__', mcp_tools());
+}
 
 session_start_app('__SLUG__');
 
