@@ -1,4 +1,4 @@
-# Déployer sur un VPS avec Caddy déjà en conteneur
+# Deploy Caddy — VPS avec Caddy déjà en conteneur
 
 Cas où un reverse-proxy Caddy tourne déjà sur le VPS (autre conteneur, autre repo) et où on veut lui ajouter une instance ma-stack-ia sans y toucher.
 
