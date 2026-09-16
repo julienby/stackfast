@@ -1,0 +1,17 @@
+# Modèle Caddy. Le proxy tourne sur le réseau docker PROXY_NETWORK (.env) et joint le conteneur par son nom.
+# Le proxy écrase toujours X-Base-Path : un client ne doit jamais pouvoir le fournir.
+
+# 1. Sous-répertoires : https://web.example.com/<slug>/ pour toutes les apps php-htmx.
+web.example.com {
+    reverse_proxy php-htmx:80 {
+        header_up -X-Base-Path
+    }
+}
+
+# 2. Domaine dédié pour une app, sans toucher au code : réécriture + préfixe public = /.
+demo.example.com {
+    rewrite * /demo{uri}
+    reverse_proxy php-htmx:80 {
+        header_up X-Base-Path /
+    }
+}

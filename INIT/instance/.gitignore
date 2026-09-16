@@ -1,0 +1,5 @@
+PLAN.md
+.env
+apps/*/*/data/*
+!apps/*/*/data/.gitkeep
+stacks/*/vendor/

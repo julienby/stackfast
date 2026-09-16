@@ -1,0 +1,12 @@
+{
+    "name": "julienby/stack-php-htmx",
+    "description": "Helpers partagés de la stack php-htmx. Une dépendance = une ligne dans DECISIONS.md.",
+    "type": "project",
+    "require": {
+        "php": ">=8.4"
+    },
+    "autoload": {
+        "psr-4": { "Stack\\": "lib/" }
+    },
+    "config": { "sort-packages": true }
+}

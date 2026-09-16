@@ -1,0 +1,47 @@
+#!/usr/bin/env sh
+# Vérifie une stack ou une app : lint + tests CLI. Exit ≠ 0 si un test échoue.
+#   bin/check                  toutes les stacks
+#   bin/check php-htmx         une stack
+#   bin/check php-htmx demo    une app
+set -eu
+cd "$(dirname "$0")/.."
+STACK="${1:-}"
+SLUG="${2:-}"
+status=0
+
+# Exécute php sur un fichier, en local si php est installé, sinon dans le conteneur de la stack.
+php_run() {
+  if command -v php >/dev/null 2>&1; then
+    php "$@"
+  else
+    file="$1"; shift
+    in_container="$(echo "$file" | sed -e 's#^apps/php-htmx#/var/www/html#' -e 's#^stacks/php-htmx#/var/www/stacks/php-htmx#')"
+    docker compose --env-file .env -f stacks/php-htmx/docker-compose.yml exec -T web php "$in_container" "$@"
+  fi
+}
+
+check_php_htmx() {
+  scope="apps/php-htmx"
+  [ -n "$SLUG" ] && scope="apps/php-htmx/$SLUG"
+  [ -d "$scope" ] || { echo "rien à vérifier : $scope absent"; return; }
+  lint=0
+  for f in $(find stacks/php-htmx/lib "$scope" -name '*.php' -not -path '*/vendor/*'); do
+    php_run -l "$f" >/dev/null 2>&1 || { php_run -l "$f" 2>&1 | head -1; lint=1; }
+  done
+  [ "$lint" -eq 0 ] && echo "lint php : ok" || { echo "lint php : FAIL"; status=1; }
+  for t in $(find "$scope" -path '*/tests/*_test.php' | sort); do
+    echo "== $t"
+    php_run "$t" || status=1
+  done
+}
+
+for s in $(ls stacks); do
+  [ -n "$STACK" ] && [ "$s" != "$STACK" ] && continue
+  case "$s" in
+    php-htmx) check_php_htmx ;;
+    *) echo "stack sans vérification : $s" ;;
+  esac
+done
+
+[ "$status" -eq 0 ] && echo "CHECK OK" || echo "CHECK FAILED"
+exit "$status"

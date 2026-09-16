@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+# Déploie une stack : git pull puis (re)construit et relance son conteneur.
+#   bin/deploy php-htmx
+set -eu
+cd "$(dirname "$0")/.."
+STACK="${1:?usage: bin/deploy <stack>}"
+[ -f "stacks/$STACK/docker-compose.yml" ] || { echo "stack inconnue : $STACK" >&2; exit 1; }
+[ -f .env ] || { echo ".env manquant : cp .env.example .env" >&2; exit 1; }
+
+if [ -n "$(git config --get remote.origin.url 2>/dev/null)" ]; then
+  git pull --ff-only
+fi
+docker compose --env-file .env -f "stacks/$STACK/docker-compose.yml" up -d --build
+docker compose --env-file .env -f "stacks/$STACK/docker-compose.yml" ps

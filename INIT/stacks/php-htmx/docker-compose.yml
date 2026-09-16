@@ -1,0 +1,22 @@
+# Lancer depuis la racine de l'instance : bin/deploy php-htmx
+# Variables : .env à la racine de l'instance (voir .env.example).
+services:
+  web:
+    build: .
+    container_name: ${PHP_HTMX_CONTAINER:-php-htmx}
+    restart: unless-stopped
+    env_file: ../../.env
+    environment:
+      # Apache tourne avec l'uid de l'hôte : data/ reste lisible et modifiable des deux côtés, sans chmod 777.
+      APACHE_RUN_USER: www-data
+      APACHE_RUN_GROUP: www-data
+    volumes:
+      - ../../apps/php-htmx:/var/www/html
+      - ./lib:/var/www/stacks/php-htmx/lib:ro
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:-caddy-net}

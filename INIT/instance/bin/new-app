@@ -1,0 +1,47 @@
+#!/usr/bin/env sh
+# Crée apps/<stack>/<slug> depuis stacks/<stack>/app-template et imprime le bloc proxy à ajouter.
+set -eu
+cd "$(dirname "$0")/.."
+
+STACK="${1:?usage: bin/new-app <stack> <slug>}"
+SLUG="${2:?usage: bin/new-app <stack> <slug>}"
+TEMPLATE="stacks/$STACK/app-template"
+DEST="apps/$STACK/$SLUG"
+
+case "$SLUG" in
+  *[!a-z0-9-]*|-*|"") echo "slug invalide : [a-z0-9-], commence par une lettre ou un chiffre" >&2; exit 1 ;;
+esac
+[ -d "$TEMPLATE" ] || { echo "stack inconnue : $STACK (pas de $TEMPLATE)" >&2; exit 1; }
+[ ! -e "$DEST" ] || { echo "existe déjà : $DEST" >&2; exit 1; }
+
+mkdir -p "apps/$STACK"
+cp -R "$TEMPLATE" "$DEST"
+find "$DEST" -type f -exec sed -i "s/__SLUG__/$SLUG/g" {} +
+echo "créée : $DEST"
+
+cat <<PROXY
+
+Sous-répertoire : rien à faire, l'app répond sur /$SLUG/ derrière le proxy de l'instance.
+Domaine dédié, bloc à ajouter (voir proxy/) :
+
+# Caddy
+$SLUG.example.com {
+    rewrite * /$SLUG{uri}
+    reverse_proxy php-htmx:80 {
+        header_up X-Base-Path /
+    }
+}
+
+# nginx
+server {
+    server_name $SLUG.example.com;
+    location / {
+        proxy_pass http://php-htmx:80/$SLUG/;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Base-Path /;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+
+Ensuite : remplir $DEST/PRD.md, puis bin/check $STACK $SLUG.
+PROXY

@@ -1,0 +1,14 @@
+# Tout passe par index.php sauf les fichiers statiques existants.
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [L]
+
+# Le proxy peut transmettre Authorization ; Apache ne l'expose pas à PHP par défaut.
+RewriteCond %{HTTP:Authorization} .
+RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+# Jamais servis directement : code, vues, données, tests.
+RewriteRule ^(lib|views|data|tests)(/|$) - [F,L]
+<FilesMatch "\.(md|json|log|tmp|lock)$">
+    Require all denied
+</FilesMatch>

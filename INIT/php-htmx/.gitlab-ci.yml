@@ -1,8 +1,0 @@
-check:
-  image: php:8.4-cli
-  before_script:
-    - apt-get update -qq && apt-get install -y -qq git unzip > /dev/null
-    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-    - composer install --no-interaction --prefer-dist
-  script:
-    - make check

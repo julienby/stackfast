@@ -1,65 +1,50 @@
 # ma-stack-ia
 
-Ma façon de travailler avec un agent de code (Claude Code, Codex, Kimi…), installable en une ligne.
+Ma façon de coder avec une IA, et les stacks qui vont avec. Ce repo est le **hub** : il ne contient aucune app.
+
+## Quatre niveaux
+
+| Niveau | Où | Contient | Qui l'écrit |
+|---|---|---|---|
+| **Méthode** | `~/.claude/CLAUDE.md` (Codex : `~/.codex/AGENTS.md`) | comment je travaille, Lessons globales | le hub (`INIT/CLAUDE.global.md`) |
+| **Instance** | un repo par VPS | `AGENTS.md`, `bin/`, `proxy/`, `.env`, `apps/` | gabarit du hub, puis le VPS |
+| **Stack** | `stacks/<stack>/` dans l'instance | conteneur, helpers partagés, `AGENTS.md` de la stack, `app-template/` | **le hub uniquement**, resynchronisé par `install.sh` |
+| **App** | `apps/<stack>/<slug>/` | `PRD.md`, `AGENTS.md`, `index.php`, `lib/`, `views/`, `data/`, `tests/` | l'app |
+
+Une app tourne sur `https://web.example.com/<slug>/` derrière le proxy (Caddy ou nginx). Lui donner un domaine = un bloc proxy, zéro changement de code.
+
+## Cinq commandes
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/julienby/ma-stack-ia/main/INIT/install.sh | sh -s -- mon-projet
-cd mon-projet        # remplir PRD.md, puis lancer claude ou codex
+curl -fsSL https://raw.githubusercontent.com/julienby/ma-stack-ia/main/INIT/install.sh | sh -s -- mon-vps
+cd mon-vps && cp .env.example .env
+bin/new-app php-htmx demo      # crée apps/php-htmx/demo depuis le gabarit, imprime le bloc proxy
+bin/check php-htmx demo        # lint + tests CLI ; un hook le relance à chaque fin de tour de Claude
+bin/deploy php-htmx            # git pull + docker compose up -d --build
 ```
 
-Le principe : **l'idée n'est rien, l'exécution compte.** Un projet = un répertoire, un contrat, un PRD, et une boucle qui apprend de ses erreurs.
+Dans Claude Code : `/new-app`, `/feature`, `/retro`.
 
----
+## Capitalisation
 
-## Ce que l'installeur pose
+- une erreur sur **une app** → `apps/<stack>/<slug>/AGENTS.md` ;
+- la même sur **deux apps** → `INIT/stacks/<stack>/AGENTS.md` dans ce hub, puis `install.sh` relancé sur chaque VPS ;
+- sur **deux stacks** → `INIT/CLAUDE.global.md`.
 
-| Où | Quoi | Rôle |
-|---|---|---|
-| `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` | `INIT/CLAUDE.global.md` | **La méthode**, indépendante de la stack. Identique sur tous mes projets. |
-| `mon-projet/AGENTS.md` (+ lien `CLAUDE.md`) | `INIT/php-htmx/AGENTS.md` | **La stack** de ce projet + ses Lessons. |
-| `mon-projet/PRD.md` | gabarit | Le produit en une page. Ce qui n'y est pas n'existe pas. |
-| `mon-projet/DECISIONS.md` | gabarit | Une ligne par arbitrage d'architecture. |
-| `mon-projet/.claude/commands/` | `/bootstrap`, `/feature`, `/retro` | Les routines. |
-| `Makefile`, CI GitHub + GitLab | `make check` | Un seul job : lint + tests. Rien n'est fini tant qu'il n'est pas vert. |
+`/retro` propose la ligne et son niveau ; rien n'est écrit sans accord.
 
-L'installeur n'écrase jamais un fichier déjà présent dans le projet. Un global existant est sauvegardé avant remplacement.
+## Stacks
 
-## La méthode (résumé du global)
+- `php-htmx` : PHP 8.4 Apache, htmx 4 + Tailwind CDN, JSON à plat puis SQLite, tests CLI. Voir `INIT/stacks/php-htmx/AGENTS.md`.
+- `python` : à venir, même moule.
 
-- **Je pilote.** L'agent propose, je tranche. Plan mode pour l'archi, le schéma, une dépendance, l'irréversible.
-- **Simple, chirurgical, prouvé.** Le minimum de code, rien d'orthogonal touché, aucun « terminé » sans sortie de tests citée.
-- **Avis honnête.** L'agent me contredit une fois, avec l'argument. Puis j'arbitre.
-- **`PLAN.md`** (gitignored) porte l'état d'une tâche. Tâche commitée → `/clear`.
-
-## Le kit `php-htmx`
-
-- PHP 8.4, Composer pour l'autoload, **aucun framework**. L'hypermédia (HATEOAS + htmx 4) est la structure.
-- **Agentification first** : la logique métier vit dans `src/Domain/` en cas d'usage appelables sans HTTP. Les handlers HTTP sont des adaptateurs fins. Un serveur MCP viendra se brancher sur les mêmes cas d'usage sans rien casser.
-- SQLite via PDO, SQL explicite. Tailwind par CDN en v1. Qualité : `php -l` + PHPUnit.
-- Le run (VPS, Docker, Caddy) est hors repo.
-
-## La boucle d'amélioration
-
-1. Je demande une feature → `/feature nom` : PRD → plan → tests → code → `make check` → diff.
-2. Fin de tâche → `/retro` : **l'agent propose lui-même** la Lesson qui aurait évité l'erreur observée, et une ligne à élaguer.
-3. Je valide → il l'écrit dans les Lessons du projet.
-4. Une Lesson qui revient sur deux projets remonte dans le global.
-
-Règle de Cherny : une ligne n'existe que pour empêcher une erreur déjà observée. Global sous ~80 lignes, projet sous ~100.
-
-## Ajouter une stack
-
-Un nouveau dossier dans `INIT/` (ex. `INIT/python-fastapi/`) avec son `AGENTS.md`, puis :
-
-```sh
-curl -fsSL .../install.sh | sh -s -- mon-projet python-fastapi
-```
-
-## Layout du dépôt
+## Repo
 
 ```
-INIT/install.sh              l'installeur
-INIT/CLAUDE.global.md        la méthode
-INIT/CLAUDE.global.v1-backup.md   ancienne version, pour mémoire
-INIT/php-htmx/               le kit projet
+INIT/install.sh          installeur idempotent (global + instance + stacks)
+INIT/CLAUDE.global.md    la méthode
+INIT/instance/           gabarit d'un VPS (copié sans écraser)
+INIT/stacks/<stack>/     une stack (copiée en écrasant)
+DECISIONS.md             arbitrages du hub
+docs/PRD.md              le pourquoi de cette organisation
 ```

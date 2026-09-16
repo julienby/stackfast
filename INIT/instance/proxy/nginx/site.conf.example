@@ -1,0 +1,24 @@
+# Modèle nginx. Le proxy joint le conteneur par son nom sur le réseau docker PROXY_NETWORK (.env).
+# Le proxy écrase toujours X-Base-Path : un client ne doit jamais pouvoir le fournir.
+
+# 1. Sous-répertoires : https://web.example.com/<slug>/ pour toutes les apps php-htmx.
+server {
+    server_name web.example.com;
+    location / {
+        proxy_pass http://php-htmx:80;
+        proxy_set_header Host $host;
+        proxy_set_header X-Base-Path "";
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# 2. Domaine dédié pour une app, sans toucher au code : préfixe interne /demo/, préfixe public /.
+server {
+    server_name demo.example.com;
+    location / {
+        proxy_pass http://php-htmx:80/demo/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Base-Path /;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
