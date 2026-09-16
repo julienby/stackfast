@@ -26,7 +26,14 @@
 ## Agentification
 
 - Métier dans `lib/` en fonctions pures (arguments → retour, exceptions), sans `$_POST`, `$_SESSION`, `echo`. Un handler d'`index.php` fait le pont.
-- Une future exposition MCP ou API ne doit ajouter qu'un adaptateur, jamais réécrire le métier.
+- Une exposition MCP ou API n'ajoute qu'un adaptateur, jamais réécrire le métier.
+
+## API et MCP
+
+- Chaque app expose `/api` (REST) et `/mcp` (JSON-RPC 2.0) par défaut, actives dès `bin/new-app`, 200 même vides (jamais 404 tant qu'aucun endpoint/outil n'est déclaré).
+- Dispatch partagé dans `stacks/php-htmx/lib/mcp_api.php` (`api_dispatch()`, `mcp_dispatch()`) — ne pas le copier dans une app.
+- Une app déclare ses endpoints dans `lib/api.php` (`api_endpoints()`) et ses outils dans `lib/mcp.php` (`mcp_tools()`), sans toucher `index.php`.
+- Les deux surfaces sont protégées par un unique bearer token `<SLUG>_API_TOKEN` (`.env`, généré et imprimé par `bin/new-app`). Header `Authorization: Bearer <token>`.
 
 ## Sécurité
 

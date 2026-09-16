@@ -35,7 +35,7 @@ Dans Claude Code : `/new-app`, `/feature`, `/retro`.
 
 ## Stacks
 
-- `php-htmx` : PHP 8.4 Apache, htmx 4 + Tailwind CDN, JSON à plat puis SQLite, tests CLI. Voir `INIT/stacks/php-htmx/AGENTS.md`.
+- `php-htmx` : PHP 8.4 Apache, htmx 4 + Tailwind CDN, JSON à plat puis SQLite, tests CLI. Chaque app expose aussi `/api` et `/mcp` par défaut (bearer token `<SLUG>_API_TOKEN`). Voir `INIT/stacks/php-htmx/AGENTS.md`.
 - `python` : à venir, même moule.
 
 ## Repo
