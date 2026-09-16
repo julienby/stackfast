@@ -1,4 +1,4 @@
-# ma-stack-ia
+# stackfast
 
 Ma façon de coder avec une IA, et les stacks qui vont avec. Ce repo est le **hub** : il ne contient aucune app.
 
@@ -16,7 +16,7 @@ Une app tourne sur `https://web.example.com/<slug>/` derrière le proxy (Caddy o
 ## Cinq commandes
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/julienby/ma-stack-ia/main/INIT/install.sh | sh -s -- mon-vps
+curl -fsSL https://raw.githubusercontent.com/julienby/stackfast/main/INIT/install.sh | sh -s -- mon-vps
 cd mon-vps && cp .env.example .env
 bin/new-app php-htmx demo      # crée apps/php-htmx/demo depuis le gabarit, imprime le bloc proxy
 bin/check php-htmx demo        # lint + tests CLI ; un hook le relance à chaque fin de tour de Claude

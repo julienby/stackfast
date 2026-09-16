@@ -1,6 +1,6 @@
 # Stack php-htmx — règles
 
-> Appartient au hub `ma-stack-ia`. **Ne pas éditer sur une instance** : toute modification se fait dans le hub, puis `install.sh` est relancé sur chaque VPS.
+> Appartient au hub `stackfast`. **Ne pas éditer sur une instance** : toute modification se fait dans le hub, puis `install.sh` est relancé sur chaque VPS.
 > Lu avant l'`AGENTS.md` de l'app. Une ligne n'existe que pour empêcher une erreur déjà observée ou fixer un contrat.
 
 ## Forme

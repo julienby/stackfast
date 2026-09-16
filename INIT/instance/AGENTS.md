@@ -16,7 +16,7 @@
 
 ## Ne fais pas
 
-- Ne modifie pas `stacks/` : il appartient au hub `ma-stack-ia`. Une règle de stack se propose via `/retro`, s'écrit dans le hub, puis `install.sh` est relancé ici.
+- Ne modifie pas `stacks/` : il appartient au hub `stackfast`. Une règle de stack se propose via `/retro`, s'écrit dans le hub, puis `install.sh` est relancé ici.
 - Ne partage rien entre deux apps autrement que par la stack. Une app n'inclut pas les fichiers d'une autre.
 - Ne commite jamais `.env`, `data/`, `vendor/`, `PLAN.md`.
 

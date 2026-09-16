@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # Installe ma stack IA : méthode globale + gabarit d'instance (un VPS) + stacks.
 #
-#   curl -fsSL https://raw.githubusercontent.com/julienby/ma-stack-ia/main/INIT/install.sh | sh -s -- mon-vps
+#   curl -fsSL https://raw.githubusercontent.com/julienby/stackfast/main/INIT/install.sh | sh -s -- mon-vps
 #   sh INIT/install.sh .            # dans un repo d'instance existant (mise à jour des stacks)
 #
 # Idempotent :
@@ -11,7 +11,7 @@
 # Prérequis : git. STACK_SRC=<chemin local du hub> évite le clone (développement du hub).
 set -eu
 
-REPO="${STACK_REPO:-https://github.com/julienby/ma-stack-ia.git}"
+REPO="${STACK_REPO:-https://github.com/julienby/stackfast.git}"
 DEST="${1:-.}"
 
 if [ -n "${STACK_SRC:-}" ]; then
