@@ -110,7 +110,7 @@ cd /var/www/mon-vps
 cp .env.example .env
 ```
 
-`init` copie `INIT/instance/` **sans écraser** les fichiers présents, puis lance `sync` pour poser les stacks, puis `git init`.
+`init` copie `INIT/instance/` **sans écraser** les fichiers présents, puis lance `sync` pour poser les stacks (et le manifeste de `bin/` et `.claude/`), puis `git init`.
 
 Contenu d'une instance :
 
@@ -463,7 +463,7 @@ Trois commandes, trois cibles différentes.
 |---|---|---|
 | `stackfast pull` | n'importe où | le clone `~/.stackfast`, puis les liens |
 | `stackfast push "msg"` | ta machine | commit de tout le clone, `pull --rebase`, push |
-| `stackfast sync` | dans une instance | `stacks/` de l'instance, rien d'autre |
+| `stackfast sync` | dans une instance | `bin/`, `.claude/` et `stacks/` de l'instance, rien d'autre |
 
 Piège : `pull` ne touche **pas** l'instance. Après un `pull`, fais `sync` dans chaque instance :
 
@@ -507,6 +507,10 @@ La sync suivante recalcule et compare.
 | `sync --force` | écrase tout |
 | Fichier supprimé du hub | supprimé aussi dans l'instance |
 | `stacks/<stack>/vendor/` | jamais touché, jamais vérifié |
+
+`bin/` et `.claude/` suivent la même règle, avec un manifeste à la racine de l'instance (`.stackfast-sums`).
+Différences : seuls les fichiers du hub sont gérés, un par un (`.claude/settings.local.json` et tes ajouts restent).
+Et sans manifeste (instance créée avant), la sync s'arrête si un de ces fichiers diffère du hub : regarde, puis `sync --force`.
 
 Tu as fait une correction à la main sur le VPS et la sync bloque ? Deux choix :
 

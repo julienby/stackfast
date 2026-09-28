@@ -38,7 +38,7 @@ stackfast pull                    # récupère le hub, refait les liens (VPS : s
 stackfast push "message"          # commit + pull --rebase + push de ce que j'ai modifié en local
 stackfast skill add ~/.claude/skills/ma-skill   # la skill passe dans le hub
 stackfast init mon-vps            # crée une instance ; stackfast sync la met à jour
-stackfast sync [--force]          # recopie les stacks ; s'arrête si une stack a été modifiée localement
+stackfast sync [--force]          # recopie bin/, .claude/ et les stacks ; s'arrête si l'un d'eux a été modifié localement
 ```
 
 Modifier `~/.claude/CLAUDE.md`, c'est modifier le clone : `stackfast push` le remonte, `stackfast pull` le redescend ailleurs.
@@ -64,7 +64,7 @@ INIT/stackfast           le client : liens global + skills, pull/push, init/sync
 INIT/skills/<skill>/     mes skills, reliées dans ~/.claude/skills/
 INIT/codex/              profils Codex rapide/fort, reliés dans ~/.codex/
 INIT/CLAUDE.global.md    la méthode
-INIT/instance/           gabarit d'un VPS (copié sans écraser)
+INIT/instance/           gabarit d'un VPS (copié sans écraser ; bin/ et .claude/ resynchronisés par sync)
 INIT/stacks/<stack>/     une stack (copiée en écrasant, sauf modification locale détectée)
 DECISIONS.md             arbitrages du hub
 docs/PRD.md              le pourquoi de cette organisation

@@ -16,8 +16,8 @@ stackfast <commande>
   link                (re)crée les liens : CLAUDE global, skills
   skill add <dossier> déplace une skill dans le hub et la relie
   init <dossier>      crée une instance (sans écraser) + ses stacks
-  sync [--force] [dossier]  remplace les stacks d'une instance par celles du hub (défaut : .)
-                      stop si une stack a été modifiée localement, sauf --force
+  sync [--force] [dossier]  remet bin/, .claude/ et stacks/ d'une instance au niveau du hub (défaut : .)
+                      stop si l'un d'eux a été modifié localement, sauf --force
   new-app <stack> <slug>  dans une instance : lance bin/new-app
 
 Hub : $HUB
@@ -115,12 +115,46 @@ sums() {
   ( cd "$1" && find . -type f ! -path './vendor/*' ! -name "$SUMS" -exec sha256sum {} + | sort -k2 )
 }
 
+# bin/ et .claude/ de l'instance : les fichiers du hub, posés un par un (settings.local.json reste).
+# Stop si un fichier posé a été modifié ou supprimé depuis la dernière sync, sauf --force.
+# Sans manifeste (instance d'avant) : stop si un fichier présent diffère du hub.
+sync_owned() {
+  force="$1"; dest="$2"
+  owned="$( cd "$SRC/instance" && find bin .claude -type f | sort )"
+  if [ "$force" -eq 0 ]; then
+    if [ -f "$dest/$SUMS" ]; then
+      changed="$( cd "$dest" && sha256sum -c --quiet "$SUMS" 2>/dev/null | cut -d: -f1 )"
+    else
+      changed="$( echo "$owned" | while read -r f; do
+        if [ -e "$dest/$f" ] && ! cmp -s "$SRC/instance/$f" "$dest/$f"; then echo "$f"; fi
+      done )"
+    fi
+    if [ -n "$changed" ]; then
+      echo "Modifs locales dans bin/ ou .claude/ (différents du hub) :" >&2
+      echo "$changed" >&2
+      die "reporte-les dans le hub, ou écrase-les : stackfast sync --force"
+    fi
+  fi
+  if [ -f "$dest/$SUMS" ]; then
+    cut -c67- "$dest/$SUMS" | while read -r f; do
+      [ -e "$SRC/instance/$f" ] || rm -f "$dest/$f"
+    done
+  fi
+  echo "$owned" | while read -r f; do
+    mkdir -p "$dest/$(dirname "$f")"
+    cp "$SRC/instance/$f" "$dest/$f"
+  done
+  ( cd "$SRC/instance" && echo "$owned" | xargs sha256sum ) > "$dest/$SUMS"
+  echo "instance   : bin/ .claude/ (synchronisés)"
+}
+
 # Stacks : remplacées par celles du hub (elles lui appartiennent), apps/ jamais touché.
 # Stop si un fichier a été modifié, ajouté ou supprimé depuis la dernière sync, sauf --force.
 cmd_sync() {
   force=0
   [ "${1:-}" = --force ] && { force=1; shift; }
   dest="${1:-.}"
+  sync_owned "$force" "$dest"
   for stack in "$SRC"/stacks/*/; do
     name="$(basename "$stack")"
     d="$dest/stacks/$name"

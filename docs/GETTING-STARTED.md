@@ -29,7 +29,7 @@ Le hub, c'est ce repo. Le client le clone une fois dans `~/.stackfast`.
 | `stackfast pull` | n'importe où | le clone `~/.stackfast` (`git pull`), puis les liens global + skills |
 | `stackfast push "msg"` | n'importe où | commit de **tout** le clone `~/.stackfast`, `pull --rebase`, puis push |
 | `stackfast init mon-vps` | n'importe où | crée les fichiers absents de l'instance, puis `sync` |
-| `stackfast sync` | dans l'instance | `stacks/` de l'instance, rien d'autre |
+| `stackfast sync` | dans l'instance | `bin/`, `.claude/` et `stacks/` de l'instance, rien d'autre |
 
 Piège : `pull` ne met **pas** à jour l'instance. Après un `pull`, lance `stackfast sync` dans chaque instance.
 
@@ -76,6 +76,8 @@ Autres cas :
 - Un fichier supprimé dans le hub est aussi supprimé dans l'instance.
 - `stacks/<stack>/vendor/` n'est jamais touché ni vérifié.
 - Première sync (pas de manifeste) : elle passe toujours.
+- `bin/` et `.claude/` suivent la même règle, avec un manifeste à la racine (`.stackfast-sums`). Seuls les fichiers du hub sont gérés : `.claude/settings.local.json` et tes ajouts restent.
+- Instance créée avant ce manifeste : la première sync s'arrête si un fichier de `bin/` ou `.claude/` diffère du hub. Regarde, puis `stackfast sync --force`.
 
 ## Exemple 5 — Le token d'une app
 
@@ -155,7 +157,7 @@ cp .env.example .env
 
 `STACKFAST_HOME="$PWD"` utilise ce clone comme hub, sans en cloner un autre.
 
-Dans l'instance, `stackfast sync` ne touche jamais `apps/`. Il remplace `stacks/`, sauf si tu l'as modifié (voir exemple 4).
+Dans l'instance, `stackfast sync` ne touche jamais `apps/`. Il remplace `bin/`, `.claude/` et `stacks/`, sauf si tu les as modifiés (voir exemple 4).
 
 ## 2. Créer une app
 
