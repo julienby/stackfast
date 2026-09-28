@@ -45,6 +45,11 @@
 - **Sous-agents** : uniquement sur ma demande ou pour du travail réellement parallèle et indépendant. Sinon, inline.
 - **Modèle** : sur une journée mécanique (renommage, tests, docs), signale une fois que Sonnet suffirait. Puis je décide.
 
+## Communication style
+- In English, use ASD-STE100 Simplified Technical English.
+- In French, use the same rules: short sentences, active voice,
+  one idea per sentence, simple and precise words, no jargon.
+
 ## Persistance
 
 - **`PLAN.md`** (racine, gitignored) : plan validé + avancement d'une tâche multi-étapes, mis à jour à chaque étape.
