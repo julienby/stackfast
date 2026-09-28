@@ -18,7 +18,7 @@ Une app tourne sur `https://web.example.com/<slug>/` derrière le proxy (Caddy o
 ```sh
 curl -fsSL https://raw.githubusercontent.com/julienby/stackfast/main/INIT/install.sh | sh -s -- mon-vps
 cd mon-vps && cp .env.example .env
-bin/new-app php-htmx demo      # crée apps/php-htmx/demo depuis le gabarit, imprime le bloc proxy
+bin/new-app php-htmx demo      # crée apps/php-htmx/demo depuis le gabarit, écrit le token dans .env, imprime le bloc proxy
 bin/check php-htmx demo        # lint + tests CLI ; un hook le relance à chaque fin de tour de Claude
 bin/deploy php-htmx            # git pull + docker compose up -d --build
 ```
@@ -28,7 +28,8 @@ Dans Claude Code : `/new-app`, `/feature`, `/retro`.
 ## Client `stackfast`
 
 `install.sh` clone le hub dans `~/.stackfast` et pose `~/.local/bin/stackfast`. Il le relie ensuite :
-`~/.claude/CLAUDE.md` et `~/.codex/AGENTS.md` pointent vers `INIT/CLAUDE.global.md`, chaque skill de `INIT/skills/` vers `~/.claude/skills/<skill>`.
+`~/.claude/CLAUDE.md` et `~/.codex/AGENTS.md` pointent vers `INIT/CLAUDE.global.md`, chaque skill de `INIT/skills/` vers `~/.claude/skills/<skill>`,
+`~/.codex/rapide.config.toml` et `~/.codex/fort.config.toml` vers `INIT/codex/` (profils Codex, effort seulement).
 Un fichier déjà présent est sauvegardé en `.bak.<date>`, jamais écrasé.
 
 ```sh
@@ -37,6 +38,7 @@ stackfast pull                    # récupère le hub, refait les liens (VPS : s
 stackfast push "message"          # commit + pull --rebase + push de ce que j'ai modifié en local
 stackfast skill add ~/.claude/skills/ma-skill   # la skill passe dans le hub
 stackfast init mon-vps            # crée une instance ; stackfast sync la met à jour
+stackfast sync [--force]          # recopie les stacks ; s'arrête si une stack a été modifiée localement
 ```
 
 Modifier `~/.claude/CLAUDE.md`, c'est modifier le clone : `stackfast push` le remonte, `stackfast pull` le redescend ailleurs.
@@ -60,11 +62,13 @@ Modifier `~/.claude/CLAUDE.md`, c'est modifier le clone : `stackfast push` le re
 INIT/install.sh          installeur idempotent du client (curl | sh)
 INIT/stackfast           le client : liens global + skills, pull/push, init/sync d'instance
 INIT/skills/<skill>/     mes skills, reliées dans ~/.claude/skills/
+INIT/codex/              profils Codex rapide/fort, reliés dans ~/.codex/
 INIT/CLAUDE.global.md    la méthode
 INIT/instance/           gabarit d'un VPS (copié sans écraser)
-INIT/stacks/<stack>/     une stack (copiée en écrasant)
+INIT/stacks/<stack>/     une stack (copiée en écrasant, sauf modification locale détectée)
 DECISIONS.md             arbitrages du hub
 docs/PRD.md              le pourquoi de cette organisation
 docs/GETTING-STARTED.md  tester en local, sans VPS ni domaine
+docs/TUTORIEL.md         tout comprendre, de bout en bout
 docs/DEPLOY-VPS.md       déployer en prod (proxy en dehors du repo, config Caddy/nginx en référence)
 ```
