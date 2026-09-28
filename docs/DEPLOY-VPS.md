@@ -5,8 +5,7 @@ Le proxy (Caddy ou nginx) est géré en dehors de ce repo — cette instance ne 
 ## 1. Créer l'instance
 
 ```sh
-git clone https://github.com/julienby/stackfast.git /tmp/hub
-sh /tmp/hub/INIT/install.sh /var/www/mon-instance
+curl -fsSL https://raw.githubusercontent.com/julienby/stackfast/main/INIT/install.sh | sh -s -- /var/www/mon-instance
 cd /var/www/mon-instance
 cp .env.example .env
 ```

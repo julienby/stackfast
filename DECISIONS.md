@@ -13,3 +13,7 @@ Une ligne par arbitrage : date, choix, pourquoi, alternative écartée.
 - 2026-09-16 — Chaque app expose `/api` et `/mcp` par défaut, scaffoldées même vides (200, liste vide). Agentic first : jamais à rajouter après coup. Écarté : les créer seulement quand l'app en a besoin.
 - 2026-09-16 — `/api` et `/mcp` répondent même vides plutôt que 404 : un client (humain ou agent) découvre toujours la surface, même sans endpoint déclaré. Écarté : 404 tant qu'aucun endpoint n'est enregistré.
 - 2026-09-16 — Un seul bearer token par app (`<SLUG>_API_TOKEN`, `.env`) protège `/api` et `/mcp` ensemble. Une app = un consommateur (l'app elle-même ou son agent), pas de raison de séparer. Écarté : un secret partagé au niveau instance ; deux tokens distincts par surface.
+- 2026-09-28 — Client `stackfast` : clone permanent du hub dans `~/.stackfast`, CLAUDE global et skills reliés par liens symboliques. Modifier en local = modifier le clone ; git fait le sens retour. Écarté : copies posées par `install.sh` (on ne sait plus ce qui a changé, ni où).
+- 2026-09-28 — Client et contenu dans le même repo, un seul `git pull` met à jour les deux. Écarté : deux repos (utile seulement si d'autres personnes ont leur propre contenu).
+- 2026-09-28 — VPS en lecture seule sur le hub (`stackfast pull` seulement). La méthode s'édite en local. Écarté : deploy key en écriture sur chaque VPS.
+- 2026-09-28 — Skills ajoutées une par une (`stackfast skill add`), liées dans `~/.claude/skills/<nom>`. Écarté : lier tout `~/.claude/skills` (le hub récupérerait les skills de tiers).

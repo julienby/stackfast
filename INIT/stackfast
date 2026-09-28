@@ -1,0 +1,133 @@
+#!/usr/bin/env sh
+# Client stackfast. Le hub est un clone git permanent (~/.stackfast par défaut) ;
+# le CLAUDE global et les skills sont des liens vers ce clone. Git fait le sens retour.
+set -eu
+
+HUB="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+SRC="$HUB/INIT"
+
+usage() {
+  cat <<EOF
+stackfast <commande>
+
+  status              changements locaux + écart avec GitHub
+  pull                récupère le hub, refait les liens
+  push "message"      commit + push des changements locaux du hub
+  link                (re)crée les liens : CLAUDE global, skills
+  skill add <dossier> déplace une skill dans le hub et la relie
+  init <dossier>      crée une instance (sans écraser) + ses stacks
+  sync [dossier]      recopie les stacks du hub dans une instance (défaut : .)
+  new-app <stack> <slug>  dans une instance : lance bin/new-app
+
+Hub : $HUB
+EOF
+}
+
+die() { echo "stackfast : $*" >&2; exit 1; }
+
+# link <cible> <lien> : un fichier déjà présent est sauvegardé, jamais écrasé.
+link() {
+  target="$1"
+  lnk="$2"
+  [ "$(readlink "$lnk" 2>/dev/null || true)" = "$target" ] && return 0
+  mkdir -p "$(dirname "$lnk")"
+  if [ -e "$lnk" ] || [ -L "$lnk" ]; then
+    mv "$lnk" "$lnk.bak.$(date +%Y%m%d%H%M%S)"
+    echo "sauvegardé : $lnk.bak.*"
+  fi
+  ln -s "$target" "$lnk"
+  echo "lien       : $lnk -> $target"
+}
+
+cmd_link() {
+  link "$SRC/CLAUDE.global.md" "$HOME/.claude/CLAUDE.md"
+  link "$SRC/CLAUDE.global.md" "$HOME/.codex/AGENTS.md"
+  for skill in "$SRC"/skills/*/; do
+    [ -d "$skill" ] || continue
+    link "${skill%/}" "$HOME/.claude/skills/$(basename "$skill")"
+  done
+}
+
+cmd_status() {
+  git -C "$HUB" fetch --quiet
+  git -C "$HUB" status --short --branch
+}
+
+cmd_pull() {
+  git -C "$HUB" pull --ff-only
+  cmd_link
+}
+
+cmd_push() {
+  [ -n "${1:-}" ] || die 'message requis : stackfast push "message"'
+  git -C "$HUB" add -A
+  git -C "$HUB" commit -m "$1"
+  git -C "$HUB" push
+}
+
+cmd_skill_add() {
+  dir="${1:-}"
+  [ -d "$dir" ] || die "pas un dossier : $dir"
+  [ -L "$dir" ] && die "déjà un lien : $dir"
+  [ -f "$dir/SKILL.md" ] || die "pas de SKILL.md dans $dir"
+  name="$(basename "$dir")"
+  [ -e "$SRC/skills/$name" ] && die "skill déjà dans le hub : $name"
+  mkdir -p "$SRC/skills"
+  mv "$dir" "$SRC/skills/$name"
+  echo "déplacé    : $dir -> $SRC/skills/$name"
+  link "$SRC/skills/$name" "$HOME/.claude/skills/$name"
+  echo "Ensuite : stackfast push \"Ajoute la skill $name\""
+}
+
+# Instance : copiée SANS écraser un fichier déjà présent.
+cmd_init() {
+  dest="${1:-}"
+  [ -n "$dest" ] || die "dossier requis : stackfast init <dossier>"
+  mkdir -p "$dest"
+  ( cd "$SRC/instance" && find . \( -type f -o -type l \) ) | while read -r f; do
+    if [ -e "$dest/$f" ] || [ -L "$dest/$f" ]; then
+      echo "conservé   : $f"
+    else
+      mkdir -p "$dest/$(dirname "$f")"
+      cp -P "$SRC/instance/$f" "$dest/$f"
+      echo "créé       : $f"
+    fi
+  done
+  cmd_sync "$dest"
+  if [ ! -d "$dest/.git" ]; then
+    git -C "$dest" init -q
+    echo "git init   : $dest"
+  fi
+  echo
+  echo "Prêt. Ensuite : cd $dest ; cp .env.example .env ; bin/new-app php-htmx <slug>."
+}
+
+# Stacks : copiées EN ÉCRASANT (elles appartiennent au hub), apps/ jamais touché.
+cmd_sync() {
+  dest="${1:-.}"
+  for stack in "$SRC"/stacks/*/; do
+    name="$(basename "$stack")"
+    mkdir -p "$dest/stacks/$name"
+    cp -R "$stack". "$dest/stacks/$name/"
+    echo "stack      : stacks/$name (synchronisée)"
+  done
+}
+
+cmd_new_app() {
+  [ -x bin/new-app ] || die "pas dans une instance (bin/new-app absent)"
+  exec bin/new-app "$@"
+}
+
+cmd="${1:-}"
+[ $# -gt 0 ] && shift
+case "$cmd" in
+  status)  cmd_status ;;
+  pull)    cmd_pull ;;
+  push)    cmd_push "$@" ;;
+  link)    cmd_link ;;
+  skill)   [ "${1:-}" = add ] || die "usage : stackfast skill add <dossier>"; shift; cmd_skill_add "$@" ;;
+  init)    cmd_init "$@" ;;
+  sync)    cmd_sync "$@" ;;
+  new-app) cmd_new_app "$@" ;;
+  *)       usage ;;
+esac

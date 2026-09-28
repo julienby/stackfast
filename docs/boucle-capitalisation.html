@@ -34,7 +34,7 @@
 <p class="lede">Un seul mécanisme de capitalisation, décliné à trois niveaux. Le hub est la seule source de vérité pour les stacks ; les instances ne font que la refléter.</p>
 
 <figure>
-<svg viewBox="0 0 920 620" role="img" aria-label="Le hub stackfast pousse ses stacks vers chaque instance via install.sh, qui écrase le dossier stacks local. Quand une erreur touche deux apps sur une instance, le développeur édite le hub directement puis relance install.sh sur chaque VPS pour repropager le correctif. Une erreur sur une seule app reste locale et ne remonte jamais.">
+<svg viewBox="0 0 920 620" role="img" aria-label="Le hub stackfast pousse ses stacks vers chaque instance via stackfast sync, qui écrase le dossier stacks local. Quand une erreur touche deux apps sur une instance, le développeur édite le hub directement puis lance stackfast pull et stackfast sync sur chaque VPS pour repropager le correctif. Une erreur sur une seule app reste locale et ne remonte jamais.">
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
@@ -74,15 +74,15 @@
     <text x="765" y="391" text-anchor="middle" class="box-sub">apps/php-htmx/shop/</text>
   </g>
 
-  <!-- Hub -> instances (install.sh, overwrite) -->
+  <!-- Hub -> instances (stackfast sync, overwrite) -->
   <line x1="410" y1="120" x2="180" y2="330" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow)"/>
   <line x1="460" y1="120" x2="460" y2="330" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow)"/>
   <line x1="510" y1="120" x2="740" y2="330" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow)"/>
-  <text x="230" y="235" class="arrow-label" text-anchor="middle">install.sh</text>
+  <text x="230" y="235" class="arrow-label" text-anchor="middle">stackfast sync</text>
   <text x="230" y="249" class="arrow-label" text-anchor="middle" fill="var(--muted)">clone + écrase stacks/</text>
-  <text x="460" y="248" class="arrow-label" text-anchor="middle">install.sh</text>
+  <text x="460" y="248" class="arrow-label" text-anchor="middle">stackfast sync</text>
   <text x="460" y="262" class="arrow-label" text-anchor="middle" fill="var(--muted)">clone + écrase stacks/</text>
-  <text x="690" y="235" class="arrow-label" text-anchor="middle">install.sh</text>
+  <text x="690" y="235" class="arrow-label" text-anchor="middle">stackfast sync</text>
   <text x="690" y="249" class="arrow-label" text-anchor="middle" fill="var(--muted)">clone + écrase stacks/</text>
 
   <!-- VPS B -> Hub, manual backport, accent dashed -->
@@ -108,8 +108,8 @@
 <h2 style="font-size:1rem;">La règle en clair</h2>
 <ol>
 <li><b>Une erreur sur une seule app</b> : corrigée dans <code>apps/&lt;stack&gt;/&lt;slug&gt;/AGENTS.md</code>, sur l'instance. Elle ne bouge plus de là.</li>
-<li><b>La même erreur sur deux apps</b> : <code>/retro</code> te le signale, tu décides. Le fix va dans <code>INIT/stacks/&lt;stack&gt;/AGENTS.md</code> — mais <span class="accent">pas depuis l'instance</span> : il faut l'écrire dans un clone du <b>hub</b> (repo <code>stackfast</code>), <code>commit</code>, <code>push</code>. L'instance ne peut pas éditer <code>stacks/</code> (c'est écrasé au prochain <code>install.sh</code>).</li>
-<li><b>Repropager vers les autres VPS</b> : sur chaque instance (A, B, C…), relancer <code>sh INIT/install.sh .</code> (ou le one-liner <code>curl … | sh</code>). Ça clone le hub à jour, écrase <code>stacks/&lt;stack&gt;/</code> localement, laisse <code>apps/</code> intact. Tu commites ensuite ce changement dans le repo de l'instance.</li>
-<li><b>Erreur qui traverse deux stacks</b> : même logique, un niveau au-dessus — elle va dans <code>~/.claude/CLAUDE.md</code> (édité directement, ou via <code>INIT/CLAUDE.global.md</code> du hub puis <code>install.sh</code> qui le repose sur chaque machine).</li>
+<li><b>La même erreur sur deux apps</b> : <code>/retro</code> te le signale, tu décides. Le fix va dans <code>INIT/stacks/&lt;stack&gt;/AGENTS.md</code> — mais <span class="accent">pas depuis l'instance</span> : il faut l'écrire dans un clone du <b>hub</b> (repo <code>stackfast</code>), <code>stackfast push</code>. L'instance ne peut pas éditer <code>stacks/</code> (c'est écrasé au prochain <code>stackfast sync</code>).</li>
+<li><b>Repropager vers les autres VPS</b> : sur chaque instance (A, B, C…), lancer <code>stackfast pull &amp;&amp; stackfast sync</code>. Ça met à jour le clone du hub, écrase <code>stacks/&lt;stack&gt;/</code> localement, laisse <code>apps/</code> intact. Tu commites ensuite ce changement dans le repo de l'instance.</li>
+<li><b>Erreur qui traverse deux stacks</b> : même logique, un niveau au-dessus — elle va dans <code>~/.claude/CLAUDE.md</code> (un lien vers <code>INIT/CLAUDE.global.md</code> du hub) : <code>stackfast push</code> ici, <code>stackfast pull</code> sur chaque machine).</li>
 </ol>
 <p style="color:var(--muted); font-size:.85rem;">Point de friction actuel : l'étape 2 est manuelle (pas de script qui édite le hub depuis une instance) — c'est voulu, ça force une relecture avant que la règle devienne globale à toutes les apps de la stack.</p>

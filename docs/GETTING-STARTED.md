@@ -10,14 +10,16 @@ Teste toute la chaîne (installeur → app → conteneur → checks) sans VPS ni
 ## 1. Créer une instance de test
 
 ```sh
-sh INIT/install.sh /tmp/mon-instance
+STACKFAST_HOME="$PWD" sh INIT/install.sh /tmp/mon-instance
 cd /tmp/mon-instance
 cp .env.example .env
 ```
 
 Édite `.env` si besoin (`HOST_UID`/`HOST_GID` doivent correspondre à ton utilisateur : `id -u`, `id -g`).
 
-Relancer `sh INIT/install.sh /tmp/mon-instance` est sans risque : `stacks/` est resynchronisé depuis le hub, `apps/` n'est jamais écrasé.
+`STACKFAST_HOME="$PWD"` utilise ce clone comme hub, sans en cloner un autre.
+
+Dans l'instance, `stackfast sync` est sans risque : `stacks/` est resynchronisé depuis le hub, `apps/` n'est jamais écrasé.
 
 ## 2. Créer une app
 
