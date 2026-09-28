@@ -2,9 +2,6 @@
   "hooks": {
     "Stop": [
       { "hooks": [ { "type": "command", "command": ".claude/hooks/verify.sh" } ] }
-    ],
-    "SubagentStop": [
-      { "hooks": [ { "type": "command", "command": ".claude/hooks/verify.sh" } ] }
     ]
   }
 }

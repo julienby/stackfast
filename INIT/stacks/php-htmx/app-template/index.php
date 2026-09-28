@@ -35,7 +35,11 @@ $body = match (true) {
     $route === 'GET /' => render('home', ['items' => items_list($store), 'csrf' => csrf_token()]),
     $route === 'POST /items' => (function () use ($store) {
         csrf_check();
-        items_add($store, (string) ($_POST['label'] ?? ''));
+        try {
+            items_add($store, (string) ($_POST['label'] ?? ''));
+        } catch (InvalidArgumentException $ex) {
+            return render('partials/items', ['items' => items_list($store), 'error' => $ex->getMessage()]);
+        }
         return render('partials/items', ['items' => items_list($store)]);
     })(),
     default => (function () {

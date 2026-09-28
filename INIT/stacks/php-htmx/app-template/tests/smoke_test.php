@@ -49,5 +49,7 @@ ok(str_contains($html, 'hx-post="/__SLUG__/items"'), 'formulaire préfixé');
 $_SERVER['HTTP_HX_REQUEST'] = 'true';
 $frag = render('partials/items', ['items' => []]);
 ok(!str_contains($frag, '<html') && str_contains($frag, 'id="items"'), 'fragment seul sous htmx');
+$frag = render('partials/items', ['items' => [], 'error' => 'label : 1 à 200 caractères']);
+ok(str_contains($frag, 'label : 1 à 200 caractères'), 'erreur de saisie affichée dans le fragment');
 
 exit($failed ? 1 : 0);

@@ -21,10 +21,16 @@ echo "créée : $DEST"
 
 ENV_VAR="$(echo "$SLUG" | tr 'a-z-' 'A-Z_')_API_TOKEN"
 TOKEN="$(openssl rand -hex 32)"
+if [ -f .env ]; then
+  echo "$ENV_VAR=$TOKEN" >> .env
+  TOKEN_MSG="Token /api + /mcp (bearer), ajouté dans .env :"
+else
+  TOKEN_MSG="Token /api + /mcp (bearer), à ajouter dans .env (absent) :"
+fi
 
 cat <<PROXY
 
-Token /api + /mcp (bearer), à ajouter dans .env :
+$TOKEN_MSG
 $ENV_VAR=$TOKEN
 
 Sous-répertoire : rien à faire, l'app répond sur /$SLUG/ derrière le proxy de l'instance.

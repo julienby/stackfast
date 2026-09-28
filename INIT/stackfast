@@ -12,11 +12,12 @@ stackfast <commande>
 
   status              changements locaux + écart avec GitHub
   pull                récupère le hub, refait les liens
-  push "message"      commit + push des changements locaux du hub
+  push "message"      commit + pull --rebase + push des changements locaux du hub
   link                (re)crée les liens : CLAUDE global, skills
   skill add <dossier> déplace une skill dans le hub et la relie
   init <dossier>      crée une instance (sans écraser) + ses stacks
-  sync [dossier]      recopie les stacks du hub dans une instance (défaut : .)
+  sync [--force] [dossier]  remplace les stacks d'une instance par celles du hub (défaut : .)
+                      stop si une stack a été modifiée localement, sauf --force
   new-app <stack> <slug>  dans une instance : lance bin/new-app
 
 Hub : $HUB
@@ -42,6 +43,8 @@ link() {
 cmd_link() {
   link "$SRC/CLAUDE.global.md" "$HOME/.claude/CLAUDE.md"
   link "$SRC/CLAUDE.global.md" "$HOME/.codex/AGENTS.md"
+  link "$SRC/codex/rapide.config.toml" "$HOME/.codex/rapide.config.toml"
+  link "$SRC/codex/fort.config.toml" "$HOME/.codex/fort.config.toml"
   for skill in "$SRC"/skills/*/; do
     [ -d "$skill" ] || continue
     link "${skill%/}" "$HOME/.claude/skills/$(basename "$skill")"
@@ -62,6 +65,8 @@ cmd_push() {
   [ -n "${1:-}" ] || die 'message requis : stackfast push "message"'
   git -C "$HUB" add -A
   git -C "$HUB" commit -m "$1"
+  git -C "$HUB" pull --rebase \
+    || die "pull --rebase a échoué dans $HUB. Si conflit : corrige les fichiers, git add, git rebase --continue, puis git push (ou git rebase --abort)"
   git -C "$HUB" push
 }
 
@@ -102,13 +107,35 @@ cmd_init() {
   echo "Prêt. Ensuite : cd $dest ; cp .env.example .env ; bin/new-app php-htmx <slug>."
 }
 
-# Stacks : copiées EN ÉCRASANT (elles appartiennent au hub), apps/ jamais touché.
+# Manifeste écrit à chaque sync : ce que le hub a posé. Sert à repérer les modifs locales.
+SUMS=.stackfast-sums
+
+# sums <dossier> : sha256 de chaque fichier, hors vendor/ et hors manifeste.
+sums() {
+  ( cd "$1" && find . -type f ! -path './vendor/*' ! -name "$SUMS" -exec sha256sum {} + | sort -k2 )
+}
+
+# Stacks : remplacées par celles du hub (elles lui appartiennent), apps/ jamais touché.
+# Stop si un fichier a été modifié, ajouté ou supprimé depuis la dernière sync, sauf --force.
 cmd_sync() {
+  force=0
+  [ "${1:-}" = --force ] && { force=1; shift; }
   dest="${1:-.}"
   for stack in "$SRC"/stacks/*/; do
     name="$(basename "$stack")"
-    mkdir -p "$dest/stacks/$name"
-    cp -R "$stack". "$dest/stacks/$name/"
+    d="$dest/stacks/$name"
+    if [ "$force" -eq 0 ] && [ -f "$d/$SUMS" ]; then
+      changed="$(sums "$d" | diff "$d/$SUMS" - | awk '/^[<>]/ {print $3}' | sort -u)"
+      if [ -n "$changed" ]; then
+        echo "Modifs locales dans stacks/$name (depuis la dernière sync) :" >&2
+        echo "$changed" >&2
+        die "reporte-les dans le hub, ou écrase-les : stackfast sync --force"
+      fi
+    fi
+    mkdir -p "$d"
+    find "$d" -mindepth 1 -maxdepth 1 ! -name vendor -exec rm -rf {} +
+    cp -R "$stack". "$d/"
+    sums "$d" > "$d/$SUMS"
     echo "stack      : stacks/$name (synchronisée)"
   done
 }

@@ -14,9 +14,9 @@ php_run() {
   if command -v php >/dev/null 2>&1; then
     php "$@"
   else
-    file="$1"; shift
-    in_container="$(echo "$file" | sed -e 's#^apps/php-htmx#/var/www/html#' -e 's#^stacks/php-htmx#/var/www/stacks/php-htmx#')"
-    docker compose --env-file .env -f stacks/php-htmx/docker-compose.yml exec -T web php "$in_container" "$@"
+    # Chaque chemin de l'hôte devient son chemin dans le conteneur (les options comme -l restent telles quelles).
+    set -- $(for a in "$@"; do echo "$a" | sed -e 's#^apps/php-htmx#/var/www/html#' -e 's#^stacks/php-htmx#/var/www/stacks/php-htmx#'; done)
+    docker compose --env-file .env -f stacks/php-htmx/docker-compose.yml exec -T web php "$@"
   fi
 }
 

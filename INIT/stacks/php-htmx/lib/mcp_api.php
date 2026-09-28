@@ -5,10 +5,16 @@ declare(strict_types=1);
 
 namespace Stack;
 
+/** Nom de la variable du token : mon-app → MON_APP_API_TOKEN (même règle que bin/new-app). */
+function token_env(string $slug): string
+{
+    return strtoupper(str_replace('-', '_', $slug)) . '_API_TOKEN';
+}
+
 /** Coupe la requête en 401 si le bearer token ne correspond pas à env(<SLUG>_API_TOKEN). */
 function bearer_check(string $slug): void
 {
-    $expected = env(strtoupper(preg_replace('/[^a-z0-9]/i', '', $slug)) . '_API_TOKEN', '');
+    $expected = env(token_env($slug), '');
     $header = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
     $token = str_starts_with($header, 'Bearer ') ? substr($header, 7) : '';
     if ($expected === '' || !hash_equals($expected, $token)) {
@@ -45,12 +51,26 @@ function api_dispatch(array $endpoints): never
 /**
  * Dispatch JSON-RPC 2.0 minimal pour MCP, monté sous /mcp. $tools : ['nom' => ['description' => ...,
  * 'handler' => callable, 'inputSchema' => [...]]]. tools/list et initialize toujours 200 (liste vide
- * par défaut). Méthode inconnue → erreur JSON-RPC -32601.
+ * par défaut). Méthode inconnue → erreur JSON-RPC -32601. Notification (sans id) → 202 sans corps.
  */
 function mcp_dispatch(string $slug, array $tools): never
 {
     $input = json_decode((string) file_get_contents('php://input'), true) ?? [];
-    $id = $input['id'] ?? null;
+    $response = mcp_handle($slug, $tools, $input);
+    if ($response === null) {
+        http_response_code(202);
+        exit;
+    }
+    json_response($response);
+}
+
+/** Réponse JSON-RPC à un message MCP, ou null pour une notification (message sans id). */
+function mcp_handle(string $slug, array $tools, array $input): ?array
+{
+    if (!array_key_exists('id', $input)) {
+        return null;
+    }
+    $id = $input['id'];
     $method = $input['method'] ?? '';
 
     $result = match ($method) {
@@ -63,10 +83,10 @@ function mcp_dispatch(string $slug, array $tools): never
         default => null,
     };
 
-    if ($result === null && $method !== 'tools/call') {
-        json_response(['jsonrpc' => '2.0', 'id' => $id, 'error' => ['code' => -32601, 'message' => "méthode inconnue : $method"]]);
+    if ($result === null) {
+        return ['jsonrpc' => '2.0', 'id' => $id, 'error' => ['code' => -32601, 'message' => "méthode inconnue : $method"]];
     }
-    json_response(['jsonrpc' => '2.0', 'id' => $id, 'result' => $result]);
+    return ['jsonrpc' => '2.0', 'id' => $id, 'result' => $result];
 }
 
 function mcp_call(array $tools, array $params): array

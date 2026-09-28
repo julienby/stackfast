@@ -1,12 +1,12 @@
 # Stack php-htmx — règles
 
-> Appartient au hub `stackfast`. **Ne pas éditer sur une instance** : toute modification se fait dans le hub, puis `stackfast pull && stackfast sync` est lancé sur chaque VPS.
+> Appartient au hub `stackfast`. **Ne pas éditer sur une instance** : toute modification se fait dans le hub, puis `stackfast pull && stackfast sync` est lancé sur chaque VPS. Une modif locale bloque `sync` (fichiers listés) ; `sync --force` l'écrase.
 > Lu avant l'`AGENTS.md` de l'app. Une ligne n'existe que pour empêcher une erreur déjà observée ou fixer un contrat.
 
 ## Forme
 
-- PHP 8.4, `declare(strict_types=1)` partout. Pas de framework, pas de classe si une fonction suffit.
-- Un conteneur `php:8.4-apache` pour toutes les apps de la stack. DocumentRoot = `apps/php-htmx`, chaque app est un sous-répertoire `<slug>/`.
+- PHP 8.5, `declare(strict_types=1)` partout. Pas de framework, pas de classe si une fonction suffit.
+- Un conteneur `php:8.5-apache` pour toutes les apps de la stack. DocumentRoot = `apps/php-htmx`, chaque app est un sous-répertoire `<slug>/`.
 - Helpers partagés : `stacks/php-htmx/lib/bootstrap.php`, namespace `Stack\`. Une app fait `use function Stack\{...}`. Pas de copie de helpers dans l'app.
 - Dépendance composer : dans `stacks/php-htmx/composer.json` (partagé), avec une ligne dans le `DECISIONS.md` de l'instance. Propose d'abord la version maison.
 - Données : JSON à plat dans `data/`, via `json_read`/`json_write` (atomique). SQLite seulement quand l'app est validée et que le volume l'exige : décision écrite.

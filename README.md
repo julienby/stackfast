@@ -34,7 +34,7 @@ Un fichier déjà présent est sauvegardé en `.bak.<date>`, jamais écrasé.
 ```sh
 stackfast status                  # changements locaux + écart avec GitHub
 stackfast pull                    # récupère le hub, refait les liens (VPS : seulement ça)
-stackfast push "message"          # commit + push de ce que j'ai modifié en local
+stackfast push "message"          # commit + pull --rebase + push de ce que j'ai modifié en local
 stackfast skill add ~/.claude/skills/ma-skill   # la skill passe dans le hub
 stackfast init mon-vps            # crée une instance ; stackfast sync la met à jour
 ```
@@ -51,7 +51,7 @@ Modifier `~/.claude/CLAUDE.md`, c'est modifier le clone : `stackfast push` le re
 
 ## Stacks
 
-- `php-htmx` : PHP 8.4 Apache, htmx 4 + Tailwind CDN, JSON à plat puis SQLite, tests CLI. Chaque app expose aussi `/api` et `/mcp` par défaut (bearer token `<SLUG>_API_TOKEN`). Voir `INIT/stacks/php-htmx/AGENTS.md`.
+- `php-htmx` : PHP 8.5 Apache, htmx 4 + Tailwind CDN, JSON à plat puis SQLite, tests CLI. Chaque app expose aussi `/api` et `/mcp` par défaut (bearer token `<SLUG>_API_TOKEN`). Voir `INIT/stacks/php-htmx/AGENTS.md`.
 - `python` : à venir, même moule.
 
 ## Repo
