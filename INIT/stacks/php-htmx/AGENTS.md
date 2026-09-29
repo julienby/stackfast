@@ -55,4 +55,5 @@
 - 2026-09-16 — ne jamais déclarer en autoload `files` un fichier qui charge lui-même `vendor/autoload.php` et qui est aussi `require`d par l'app : boucle de redéclaration (`Cannot redeclare function`). (erreur observée : `bootstrap.php` en autoload `files` + `require` explicite → fatal.)
 - 2026-09-16 — toujours garder un guard explicite contre les chaînes vides avant un `hash_equals()` de token : vide == vide passe sinon. (erreur observée : `csrf_check()` acceptait une requête sans cookie ni token.)
 - 2026-09-16 — `APACHE_RUN_USER` numérique sans entrée `/etc/passwd` correspondante échoue silencieusement (Apache reste en root) ; toujours remapper un utilisateur nommé existant (`usermod -u`) et le référencer par nom. (erreur observée : `AH02155 getpwuid`, tous les processus apache2 en root malgré `APACHE_RUN_USER=#1000`.)
+- 2026-09-29 — Mettre à jour les tests de rendu avec les vues qu’ils décrivent. (erreur observée : les tests du squelette sont restés après son remplacement.)
 - format : `- YYYY-MM-DD — règle. (erreur observée : ...)`. Ajoutées dans le hub uniquement.
