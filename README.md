@@ -61,7 +61,7 @@ Modifier `~/.claude/CLAUDE.md`, c'est modifier le clone : `stackfast push` le re
 ```
 INIT/install.sh          installeur idempotent du client (curl | sh)
 INIT/stackfast           le client : liens global + skills, pull/push, init/sync d'instance
-INIT/skills/<skill>/     mes skills, reliées dans ~/.claude/skills/
+INIT/skills/<skill>/     mes skills, reliées dans ~/.claude/skills/ (`explain` : page HTML dans ~/.cache/explain/)
 INIT/codex/              profils Codex rapide/fort, reliés dans ~/.codex/
 INIT/CLAUDE.global.md    la méthode
 INIT/instance/           gabarit d'un VPS (copié sans écraser ; bin/ et .claude/ resynchronisés par sync)
