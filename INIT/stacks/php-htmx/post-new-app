@@ -1,0 +1,45 @@
+#!/usr/bin/env sh
+# Après bin/new-app : token /api + /mcp et bloc proxy. Arguments : <slug> <dossier de l'app>.
+set -eu
+SLUG="$1"
+DEST="$2"
+STACK=php-htmx
+
+ENV_VAR="$(echo "$SLUG" | tr 'a-z-' 'A-Z_')_API_TOKEN"
+TOKEN="$(openssl rand -hex 32)"
+if [ -f .env ]; then
+  echo "$ENV_VAR=$TOKEN" >> .env
+  TOKEN_MSG="Token /api + /mcp (bearer), ajouté dans .env :"
+else
+  TOKEN_MSG="Token /api + /mcp (bearer), à ajouter dans .env (absent) :"
+fi
+
+cat <<PROXY
+
+$TOKEN_MSG
+$ENV_VAR=$TOKEN
+
+Sous-répertoire : rien à faire, l'app répond sur /$SLUG/ derrière le proxy de l'instance.
+Domaine dédié, bloc à ajouter (voir proxy/) :
+
+# Caddy
+$SLUG.example.com {
+    rewrite * /$SLUG{uri}
+    reverse_proxy php-htmx:80 {
+        header_up X-Base-Path /
+    }
+}
+
+# nginx
+server {
+    server_name $SLUG.example.com;
+    location / {
+        proxy_pass http://php-htmx:80/$SLUG/;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Base-Path /;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+
+Ensuite : remplir $DEST/PRD.md, puis bin/check $STACK $SLUG.
+PROXY

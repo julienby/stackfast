@@ -13,6 +13,7 @@
 - **exposer une app sur un domaine** → un bloc dans le proxy, modèle dans `proxy/`. Zéro changement de code.
 - **ajouter un secret** → `.env` (gitignoré), documenté dans `.env.example` sans valeur.
 - **prendre une décision d'architecture** → une ligne dans `DECISIONS.md`, après validation.
+- **placer une règle** → si elle reste vraie sur une autre stack, elle va dans la méthode (`~/.claude/CLAUDE.md`), sinon dans la stack. Le code propre à une stack vit dans `stacks/<stack>/` (`check`, `post-new-app`), jamais dans `bin/`.
 
 ## Ne fais pas
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Crée apps/<stack>/<slug> depuis stacks/<stack>/app-template et imprime le bloc proxy à ajouter.
+# Crée apps/<stack>/<slug> depuis stacks/<stack>/app-template, puis lance stacks/<stack>/post-new-app s'il existe.
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -19,41 +19,6 @@ cp -R "$TEMPLATE" "$DEST"
 find "$DEST" -type f -exec sed -i "s/__SLUG__/$SLUG/g" {} +
 echo "créée : $DEST"
 
-ENV_VAR="$(echo "$SLUG" | tr 'a-z-' 'A-Z_')_API_TOKEN"
-TOKEN="$(openssl rand -hex 32)"
-if [ -f .env ]; then
-  echo "$ENV_VAR=$TOKEN" >> .env
-  TOKEN_MSG="Token /api + /mcp (bearer), ajouté dans .env :"
-else
-  TOKEN_MSG="Token /api + /mcp (bearer), à ajouter dans .env (absent) :"
+if [ -x "stacks/$STACK/post-new-app" ]; then
+  exec "stacks/$STACK/post-new-app" "$SLUG" "$DEST"
 fi
-
-cat <<PROXY
-
-$TOKEN_MSG
-$ENV_VAR=$TOKEN
-
-Sous-répertoire : rien à faire, l'app répond sur /$SLUG/ derrière le proxy de l'instance.
-Domaine dédié, bloc à ajouter (voir proxy/) :
-
-# Caddy
-$SLUG.example.com {
-    rewrite * /$SLUG{uri}
-    reverse_proxy php-htmx:80 {
-        header_up X-Base-Path /
-    }
-}
-
-# nginx
-server {
-    server_name $SLUG.example.com;
-    location / {
-        proxy_pass http://php-htmx:80/$SLUG/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Base-Path /;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-}
-
-Ensuite : remplir $DEST/PRD.md, puis bin/check $STACK $SLUG.
-PROXY
