@@ -16,10 +16,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends sqlite3 \
  && echo "ServerName localhost" >> /etc/apache2/apache2.conf \
  && sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
 
-ADD https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp_linux /usr/local/bin/yt-dlp
-RUN echo '58162f9bfdc27458ea47bfcb311cf47028f17d8154a8bf7d689861d46399230a  /usr/local/bin/yt-dlp' | sha256sum -c - \
- && chmod 755 /usr/local/bin/yt-dlp
-
 COPY php.ini /usr/local/etc/php/
 COPY --from=deps /app/vendor /var/www/stacks/php-htmx/vendor
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh

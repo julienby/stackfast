@@ -13,8 +13,11 @@ services:
       - ./lib:/var/www/stacks/php-htmx/lib:ro
     networks:
       - proxy
+      - app_services
 
 networks:
   proxy:
     external: true
     name: ${PROXY_NETWORK:-caddy-net}
+  app_services:
+    name: ${PHP_HTMX_CONTAINER:-php-htmx}-apps

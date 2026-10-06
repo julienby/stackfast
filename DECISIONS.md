@@ -3,6 +3,7 @@
 Une ligne par arbitrage : date, choix, pourquoi, alternative écartée.
 
 - 2026-09-29 — Image php-htmx : binaire officiel `yt-dlp_linux` 2026.08.19 épinglé par SHA-256 pour les transcripts YouTube ; paquet système écarté car sa version suit le cycle Debian, et installation Python écartée pour limiter les dépendances.
+- 2026-10-02 — Les services propres aux apps ont leur Compose et joignent un réseau privé partagé avec leur stack ; `bin/deploy` les démarre avec un nom de projet unique. Intégrer leurs dépendances à l’image commune ou donner le socket Docker au web écarté. Remplace la décision du 2026-09-29 sur yt-dlp dans l’image PHP.
 
 - 2026-08-20 — kit php-htmx : un repo par app, libs copiées, pas extraites. **Remplacée le 2026-09-16.**
 - 2026-09-16 — Un monorepo par VPS (instance), multi-stack : `apps/<stack>/<slug>`. Une seule chose à déployer, un seul contrat à lire. Écarté : un repo par stack ou par app (autant de repos que de SaaS).

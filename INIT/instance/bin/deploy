@@ -10,5 +10,13 @@ STACK="${1:?usage: bin/deploy <stack>}"
 if [ -n "$(git config --get remote.origin.url 2>/dev/null)" ]; then
   git pull --ff-only
 fi
-docker compose --env-file .env -f "stacks/$STACK/docker-compose.yml" up -d --build
+docker compose --env-file .env -f "stacks/$STACK/docker-compose.yml" up -d --build --force-recreate
 docker compose --env-file .env -f "stacks/$STACK/docker-compose.yml" ps
+for service_file in apps/"$STACK"/*/services/*/docker-compose.yml; do
+  [ -f "$service_file" ] || continue
+  app=$(basename "$(dirname "$(dirname "$(dirname "$service_file")")")")
+  service=$(basename "$(dirname "$service_file")")
+  project=$(basename "$PWD")-"$STACK"-"$app"-"$service"
+  docker compose -p "$project" --env-file .env -f "$service_file" up -d --build
+  docker compose -p "$project" --env-file .env -f "$service_file" ps
+done
