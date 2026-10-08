@@ -37,6 +37,10 @@
 - Jamais « terminé » sans preuve. Cite la sortie des tests, ne la résume pas. Dis ce que tu n'as pas pu tester.
 - Cause racine, pas contournement. Pas de `TODO` qui masque le vrai problème.
 
+## CSS
+
+- Read https://good-css.com before you write CSS.
+
 ## Économie de contexte
 
 - Lecture ciblée : grep ou plage de lignes plutôt que fichier entier. Pas d'exploration « pour voir ». Pas de re-lecture d'un fichier inchangé.
