@@ -10,8 +10,10 @@ COPY composer.json composer.lock* ./
 RUN composer install --no-dev --prefer-dist --no-progress --no-interaction
 
 FROM php:8.5-apache
-RUN apt-get update && apt-get install -y --no-install-recommends sqlite3 \
+RUN apt-get update && apt-get install -y --no-install-recommends sqlite3 libjpeg-dev libpng-dev libwebp-dev \
  && rm -rf /var/lib/apt/lists/* \
+ && docker-php-ext-configure gd --with-jpeg --with-webp \
+ && docker-php-ext-install -j"$(nproc)" gd exif \
  && a2enmod rewrite headers \
  && echo "ServerName localhost" >> /etc/apache2/apache2.conf \
  && sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf

@@ -3,6 +3,7 @@
     "description": "Helpers partagés de la stack php-htmx. Une dépendance = une ligne dans DECISIONS.md.",
     "type": "project",
     "require": {
+        "league/commonmark": "^2.7",
         "php": ">=8.5"
     },
     "autoload": {
