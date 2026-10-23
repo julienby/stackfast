@@ -3,3 +3,5 @@ PLAN.md
 apps/*/*/data/*
 !apps/*/*/data/.gitkeep
 proxy/generated.caddy*
+.agents/
+proxy/preview-auth

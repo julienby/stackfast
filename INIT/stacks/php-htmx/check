@@ -9,19 +9,8 @@ DIR="${1:?usage: stacks/php-htmx/check apps/php-htmx/<slug>}"
 
 set -- --rm --network none --read-only --tmpfs /tmp:mode=1777 --cap-drop ALL --security-opt no-new-privileges \
   -u "${HOST_UID:-1000}:${HOST_GID:-1000}" \
-  -v "$PWD/$DIR:/app" -v "$PWD/stacks/php-htmx/lib:/stacks/php-htmx/lib:ro" -w /app
+  -v "$PWD/$DIR:/app" -v "$PWD/stacks/php-htmx/lib:/stacks/php-htmx/lib:ro" \
+  -v "$PWD/stacks/php-htmx/run-checks:/usr/local/bin/run-checks:ro" -w /app
 [ -f "$DIR/.env" ] && set -- "$@" --env-file "$DIR/.env"
 
-docker run "$@" "$IMAGE" sh -c '
-status=0
-lint=0
-for f in $(find /app /stacks/php-htmx/lib -name "*.php" -not -path "*/vendor/*" -not -path "/app/data/*"); do
-  php -l "$f" >/dev/null 2>&1 || { php -l "$f" 2>&1 | head -1; lint=1; }
-done
-[ "$lint" -eq 0 ] && echo "lint php : ok" || { echo "lint php : FAIL"; status=1; }
-for t in $(find /app/tests -name "*_test.php" 2>/dev/null | sort); do
-  echo "== ${t#/app/}"
-  php "$t" || status=1
-done
-exit "$status"
-'
+docker run "$@" "$IMAGE" run-checks

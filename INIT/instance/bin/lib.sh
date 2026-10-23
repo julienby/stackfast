@@ -78,3 +78,31 @@ image_stale() {
 
 # app_container <slug> : nom du conteneur web (joint par le proxy).
 app_container() { echo "$INSTANCE-$1"; }
+
+# --- Agents : une copie de travail isolée par agent, .agents/<slug>/<nom>/ (jamais dans git) ---
+AGENTS_DIR=".agents"
+
+agent_dir() { echo "$AGENTS_DIR/$1/$2"; }
+agent_container() { echo "$INSTANCE-agent-$1-$2"; }
+
+# agents : une ligne "<slug> <nom>" par agent existant (dossier créé par bin/agent).
+agents() {
+  for m in "$AGENTS_DIR"/*/*/meta; do
+    [ -f "$m" ] || continue
+    d="${m%/meta}"
+    echo "$(basename "$(dirname "$d")") $(basename "$d")"
+  done
+}
+
+# agent_meta <slug> <nom> <CLÉ> : valeur dans le fichier meta de l'agent.
+agent_meta() { sed -n "s/^$3=//p" "$(agent_dir "$1" "$2")/meta" | head -1; }
+
+# agent_running <slug> <nom> : vrai si le conteneur de l'agent tourne.
+agent_running() { [ "$(docker inspect -f '{{.State.Running}}' "$(agent_container "$1" "$2")" 2>/dev/null || true)" = true ]; }
+
+# agent_url <slug> <nom> : adresse de la preview (derrière le proxy, avec mot de passe).
+agent_url() {
+  if [ -n "${APPS_HOST:-}" ]; then echo "https://$APPS_HOST/_preview/$1/$2/"
+  else echo "(APPS_HOST manquant dans .env)"
+  fi
+}

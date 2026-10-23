@@ -13,7 +13,7 @@ WORKDIR /app
 COPY composer.json composer.lock* ./
 RUN composer install --no-dev --prefer-dist --no-progress --no-interaction
 
-FROM ${BASE_IMAGE}
+FROM ${BASE_IMAGE} AS app
 RUN install-php-extensions gd exif \
  && apt-get update && apt-get install -y --no-install-recommends sqlite3 \
  && rm -rf /var/lib/apt/lists/*
@@ -33,3 +33,16 @@ ENV XDG_CONFIG_HOME=/config XDG_DATA_HOME=/data
 WORKDIR /app
 EXPOSE 8080
 CMD ["frankenphp", "run", "--config", "/etc/frankenphp/Caddyfile"]
+
+# Sandbox d'agent (`stackfast agent`) : la même image + git, node et Claude Code. L'agent sert son app
+# (preview) et lance ses tests avec le php de cette image ; il n'a ni docker, ni les autres apps.
+# Build : docker build --target agent (bin/agent, bin/update). L'image des apps est la cible `app`.
+FROM app AS agent
+RUN apt-get update && apt-get install -y --no-install-recommends git nodejs npm ripgrep jq less procps \
+ && rm -rf /var/lib/apt/lists/* \
+ && npm install -g @anthropic-ai/claude-code && npm cache clean --force
+COPY agent-entrypoint.sh /usr/local/bin/agent-entrypoint.sh
+ENV HOME=/home/agent GIT_AUTHOR_NAME=agent GIT_AUTHOR_EMAIL=agent@sandbox GIT_COMMITTER_NAME=agent GIT_COMMITTER_EMAIL=agent@sandbox
+WORKDIR /work
+ENTRYPOINT ["/usr/local/bin/agent-entrypoint.sh"]
+CMD ["sleep", "infinity"]

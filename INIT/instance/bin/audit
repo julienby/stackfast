@@ -5,6 +5,7 @@
 . "$(dirname "$0")/lib.sh"
 
 status=0
+flag="$(mktemp)"   # les boucles tournent dans des sous-shells : un fichier témoin remonte l'échec
 
 for stack in $(apps | cut -d' ' -f1 | sort -u); do
   img="$(image "$stack"):current"
@@ -25,12 +26,26 @@ for stack in $(apps | cut -d' ' -f1 | sort -u); do
     id="$(docker inspect -f '{{.Image}}' "$c" 2>/dev/null || true)"
     health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$c" 2>/dev/null || echo arrêtée)"
     if [ -z "$id" ]; then echo "  $slug : arrêtée"
-    elif [ "$id" != "$current_id" ]; then echo "  $slug : ANCIENNE IMAGE → stackfast up $slug"; exit 1
-    elif [ "$health" != healthy ]; then echo "  $slug : $health → stackfast logs $slug"; exit 1
+    elif [ "$id" != "$current_id" ]; then echo "  $slug : ANCIENNE IMAGE → stackfast up $slug"; echo 1 > "$flag"
+    elif [ "$health" != healthy ]; then echo "  $slug : $health → stackfast logs $slug"; echo 1 > "$flag"
     else echo "  $slug : ok"
     fi
-  done || status=1
+  done
+  [ -s "$flag" ] && status=1
 done
+
+# Agents : leur sandbox embarque PHP et sert une preview sur Internet. Même exigence que les apps.
+if [ -n "$(agents)" ]; then
+  echo "## agents"
+  agents | while read -r slug name; do
+    c="$(agent_container "$slug" "$name")"
+    if ! agent_running "$slug" "$name"; then echo "  $slug/$name : arrêté"; continue; fi
+    cur="$(docker image inspect -f '{{.Id}}' "$(image "$(agent_meta "$slug" "$name" stack)")-agent:current" 2>/dev/null || true)"
+    if [ "$(docker inspect -f '{{.Image}}' "$c")" = "$cur" ]; then echo "  $slug/$name : ok"
+    else echo "  $slug/$name : ANCIENNE IMAGE → stackfast agent start $slug $name"; echo 1 > "$flag"; fi
+  done
+  [ -s "$flag" ] && status=1
+fi
 
 echo "## proxy"
 if docker inspect "$PROXY" >/dev/null 2>&1; then
@@ -41,4 +56,5 @@ fi
 
 echo
 [ "$status" -eq 0 ] && echo "audit : rien à faire" || echo "audit : action nécessaire (voir ci-dessus)"
+rm -f "$flag"
 exit "$status"

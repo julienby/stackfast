@@ -29,6 +29,16 @@ stackfast deploy                                # sur le VPS après un push : gi
 
 Aussi : `up`, `down`, `logs`, `shell`, `rollback`, `proxy`, `migrate`. `stackfast` sans argument les liste.
 
+## Des agents sur une app, isolés
+
+```sh
+stackfast agent new demo a1 a2 a3               # 3 sandboxes : copie de l'app, conteneur, réseau, preview protégée
+stackfast agent run demo a1 "ajoute un export CSV"   # Claude Code en autonomie
+stackfast agent diff demo a1 && stackfast agent apply demo a1   # tu relis, puis fusion à 3 voies
+```
+
+Un agent ne voit que son app : ni les autres apps, ni les secrets, ni docker. Voir [docs/AGENTS-ISOLES.md](docs/AGENTS-ISOLES.md).
+
 Dans Claude Code : `/new-app`, `/feature`, `/retro`.
 
 ## Client `stackfast`
@@ -78,4 +88,5 @@ docs/GETTING-STARTED.md  tester en local, sans VPS ni domaine
 docs/TUTORIEL.md         tout comprendre, de bout en bout
 docs/DEPLOY-VPS.md       déployer en prod, migrer une instance de l'ancien modèle
 docs/SECURITE.md         une faille PHP est annoncée : update + audit
+docs/AGENTS-ISOLES.md    plusieurs agents sur une app : sandbox, preview, fusion
 ```

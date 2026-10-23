@@ -42,6 +42,21 @@ generate() {
         echo "	}"
       fi
     done
+    # Previews des agents actifs : jamais sans mot de passe (proxy/preview-auth, créé au premier agent).
+    if [ -f proxy/preview-auth ]; then
+      read -r puser phash < proxy/preview-auth
+      agents | while read -r slug name; do
+        agent_running "$slug" "$name" || continue
+        echo "	redir /_preview/$slug/$name /_preview/$slug/$name/ 308"
+        echo "	handle_path /_preview/$slug/$name/* {"
+        echo "		basic_auth {"
+        echo "			$puser $phash"
+        echo "		}"
+        echo "		header X-Robots-Tag noindex"
+        echo "		import stackfast_app $(agent_container "$slug" "$name"):$(stack_conf "$(agent_meta "$slug" "$name" stack)" PORT) /_preview/$slug/$name"
+        echo "	}"
+      done
+    fi
     echo "	handle {"
     echo "		respond \"Aucune app ici.\" 404"
     echo "	}"
@@ -78,6 +93,11 @@ docker compose --env-file .env -f proxy/compose.yml up -d >/dev/null 2>&1 \
 # Le proxy rejoint le réseau de chaque app démarrée : il est le seul à les voir toutes.
 apps | while read -r stack slug; do
   net="$INSTANCE-$slug"
+  docker network inspect "$net" >/dev/null 2>&1 || continue
+  docker network connect "$net" "$PROXY" 2>/dev/null || true
+done
+agents | while read -r slug name; do
+  net="$(agent_container "$slug" "$name")"
   docker network inspect "$net" >/dev/null 2>&1 || continue
   docker network connect "$net" "$PROXY" 2>/dev/null || true
 done

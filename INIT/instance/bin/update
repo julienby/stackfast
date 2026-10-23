@@ -15,10 +15,19 @@ build_only=0
 build() {
   img="$(image "$1")"
   echo "== construction $img (base $(stack_conf "$1" BASE_IMAGE), --pull)"
-  docker build --pull \
+  docker build --pull --target app \
     --build-arg "BASE_IMAGE=$(stack_conf "$1" BASE_IMAGE)" \
     --label "stackfast.context=$(context_hash "$1")" \
     -t "$img:next" "stacks/$1"
+}
+
+# Image de sandbox des agents (cible `agent` du Dockerfile) : même base PHP, donc mêmes correctifs.
+build_agent() {
+  echo "== construction $(image "$1")-agent (sandbox des agents)"
+  docker build --pull --target agent \
+    --build-arg "BASE_IMAGE=$(stack_conf "$1" BASE_IMAGE)" \
+    --label "stackfast.context=$(context_hash "$1")" \
+    -t "$(image "$1")-agent:current" "stacks/$1"
 }
 
 promote() {
@@ -38,6 +47,7 @@ update_stack() {
       || { docker rmi "$(image "$stack"):next" >/dev/null; die "tests rouges : rien n'a changé, les apps tournent toujours sur l'ancienne image"; }
   fi
   promote "$stack"
+  [ -f "stacks/$stack/agent-setup" ] && build_agent "$stack"
   apps "$stack" | while read -r s slug; do
     compose_app "$slug" up -d --force-recreate --wait --wait-timeout 60 \
       || echo "ATTENTION : $slug n'est pas saine après la bascule → stackfast logs $slug, ou stackfast rollback $stack" >&2

@@ -1,0 +1,293 @@
+#!/usr/bin/env sh
+# Agents isolés sur une app : chacun a sa copie de travail, son conteneur, son réseau, sa preview.
+#   bin/agent new <slug> <nom>… [--with-data]   crée et démarre un ou plusieurs agents (a1 a2 a3…)
+#   bin/agent run <slug> <nom> [--follow] <consigne>   lance Claude Code en autonomie, en arrière-plan
+#   bin/agent shell <slug> <nom> [commande…]    session interactive (défaut : claude) dans la sandbox
+#   bin/agent ls                                agents, état, preview, fichiers modifiés
+#   bin/agent diff <slug> <nom>                 ce que l'agent a changé dans l'app
+#   bin/agent apply <slug> <nom>                fusionne (3 voies) ses changements dans apps/<stack>/<slug>
+#   bin/agent logs <slug> <nom>                 dernière exécution (run)
+#   bin/agent start|stop <slug> <nom>           (re)crée le conteneur / l'arrête (fichiers conservés)
+#   bin/agent rm <slug> <nom> [--force]         supprime l'agent (refuse s'il reste des changements non appliqués)
+#   bin/agent passwd                            nouveau mot de passe des previews
+# L'agent ne voit que : son app (écriture), la stack (lecture seule), le contrat de l'instance. Ni les autres apps,
+# ni les .env, ni docker. Seuls les changements dans apps/<stack>/<slug>/ peuvent revenir (apply).
+. "$(dirname "$0")/lib.sh"
+
+# Fichiers de l'app qui ne reviennent jamais : données, secrets, dépendances.
+EXCL="-x data -x .env -x .env.agent -x .sessions -x vendor -x .git"
+VALID='^[a-z0-9]+(-[a-z0-9]+)*$'
+
+usage() { sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-1}"; }
+
+# Le .gitignore d'une instance existante appartient à l'instance (jamais resynchronisé) : on y ajoute ce qu'il faut.
+ensure_gitignore() {
+  touch .gitignore
+  for line in .agents/ proxy/preview-auth proxy/generated.caddy; do
+    grep -qxF "$line" .gitignore || echo "$line" >> .gitignore
+  done
+}
+
+need_agent() {
+  [ -f "$(agent_dir "$1" "$2")/meta" ] || die "agent inconnu : $1/$2 (stackfast agent ls)"
+}
+
+agent_image() { echo "$(image "$1")-agent:current"; }
+
+ensure_image() {
+  img="$(agent_image "$1")"
+  built="$(docker image inspect -f '{{index .Config.Labels "stackfast.context"}}' "$img" 2>/dev/null || true)"
+  [ "$built" = "$(context_hash "$1")" ] && return 0
+  say image "construction de la sandbox $img (une fois, quelques minutes)"
+  mkdir -p "$ROOT/.agents"
+  docker build --target agent \
+    --build-arg "BASE_IMAGE=$(stack_conf "$1" BASE_IMAGE)" \
+    --label "stackfast.context=$(context_hash "$1")" \
+    -t "$img" "stacks/$1" > "$ROOT/.agents/build.log" 2>&1 || { tail -20 "$ROOT/.agents/build.log" >&2; die "construction de $img échouée"; }
+}
+
+# Mot de passe des previews : un seul pour l'instance, haché dans proxy/preview-auth (jamais en clair sur le disque).
+ensure_preview_auth() {
+  [ -f proxy/preview-auth ] && return 0
+  set_preview_password
+}
+set_preview_password() {
+  "$ROOT/bin/proxy" >/dev/null 2>&1 || true
+  docker inspect "$PROXY" >/dev/null 2>&1 || die "proxy arrêté : stackfast proxy"
+  pw="$(openssl rand -hex 12)"
+  hash="$(docker exec "$PROXY" caddy hash-password --plaintext "$pw")"
+  printf 'preview %s\n' "$hash" > proxy/preview-auth
+  chmod 600 proxy/preview-auth
+  say previews "utilisateur : preview — mot de passe : $pw (affiché une seule fois ; stackfast agent passwd pour le changer)"
+}
+
+# Copie de travail : miroir réduit de l'instance. Rien d'autre que l'app, la stack et le contrat.
+prepare() {
+  slug="$1"; name="$2"; stack="$3"; with_data="$4"
+  ad="$(agent_dir "$slug" "$name")"
+  app="apps/$stack/$slug"
+  mkdir -p "$ad/work/apps/$stack" "$ad/work/stacks" "$ad/home" "$ad/base"
+
+  tar -C "$app" --exclude=./.env --exclude=./.env.agent --exclude=./.sessions --exclude='./data/*' -cf - . \
+    | { mkdir -p "$ad/work/$app"; tar -C "$ad/work/$app" -xf -; }
+  mkdir -p "$ad/work/$app/data"; [ -f "$app/data/.gitkeep" ] && : > "$ad/work/$app/data/.gitkeep"
+  if [ "$with_data" = 1 ] && [ -d "$app/data" ]; then
+    ( cd "$app/data" && tar --exclude=./.sessions -cf - . ) | tar -C "$ad/work/$app/data" -xf -
+  fi
+  tar -C "stacks/$stack" --exclude=./vendor --exclude=./.stackfast-sums -cf - . \
+    | { mkdir -p "$ad/work/stacks/$stack"; tar -C "$ad/work/stacks/$stack" -xf -; }
+
+  # Contrat de la sandbox (lecture seule pour l'agent) : AGENTS.md, CLAUDE.md, hook de fin de tour.
+  sed -e "s/__SLUG__/$slug/g" -e "s/__STACK__/$stack/g" -e "s/__NAME__/$name/g" -e "s#__PREVIEW__#$(agent_url "$slug" "$name")#g" \
+    agent/AGENTS.md > "$ad/work/AGENTS.md"
+  cp "$ad/work/AGENTS.md" "$ad/work/CLAUDE.md"
+  mkdir -p "$ad/work/.claude/hooks"
+  cp agent/claude/settings.json "$ad/work/.claude/settings.json"
+  sed -e "s/__SLUG__/$slug/g" -e "s/__STACK__/$stack/g" agent/claude/hooks/verify.sh > "$ad/work/.claude/hooks/verify.sh"
+  chmod +x "$ad/work/.claude/hooks/verify.sh"
+  [ -n "${STACKFAST_HOME:-}" ] && [ -f "$STACKFAST_HOME/INIT/CLAUDE.global.md" ] \
+    && { mkdir -p "$ad/home/.claude"; cp "$STACKFAST_HOME/INIT/CLAUDE.global.md" "$ad/home/.claude/CLAUDE.md"; }
+  [ -x "stacks/$stack/agent-setup" ] && "stacks/$stack/agent-setup" "$ad/work"
+
+  # Base de la fusion : l'app telle qu'elle était au départ.
+  cp -a "$ad/work/$app/." "$ad/base/"
+  rm -rf "$ad/base/data" "$ad/base/.git"
+
+  # Variables d'env de l'agent : son propre token ; les autres secrets seulement si l'app les autorise (.env.agent).
+  { [ -f "$app/.env.agent" ] && cat "$app/.env.agent"
+    echo "$(echo "$slug" | tr 'a-z-' 'A-Z_')_API_TOKEN=$(openssl rand -hex 16)"
+  } > "$ad/env"
+  chmod 600 "$ad/env"
+  { echo "stack=$stack"; echo "created=$(date +%Y-%m-%dT%H:%M:%S)"; } > "$ad/meta"
+}
+
+start() {
+  slug="$1"; name="$2"
+  need_agent "$slug" "$name"
+  stack="$(agent_meta "$slug" "$name" stack)"
+  ad="$(agent_dir "$slug" "$name")"
+  c="$(agent_container "$slug" "$name")"
+  ensure_image "$stack"
+  ensure_preview_auth
+  abs="$ROOT/$ad"
+  docker rm -f "$c" >/dev/null 2>&1 || true
+  docker network inspect "$c" >/dev/null 2>&1 || docker network create "$c" >/dev/null
+  # Seuls l'app (/app et /work/apps/…) et le dépôt git de travail sont en écriture ; stacks/, contrat et hook sont en lecture seule.
+  docker run -d --init --name "$c" --network "$c" \
+    --user "${HOST_UID:-1000}:${HOST_GID:-1000}" \
+    --read-only --cap-drop ALL --security-opt no-new-privileges \
+    --memory "${AGENT_MEM:-1g}" --cpus "${AGENT_CPUS:-2}" --pids-limit 512 \
+    --tmpfs /tmp:mode=1777 --tmpfs /data:mode=1777 --tmpfs /config:mode=1777 \
+    -v "$abs/work:/work" \
+    -v "$abs/work/apps/$stack/$slug:/app" \
+    -v "$abs/work/stacks:/work/stacks:ro" \
+    -v "$abs/work/stacks/$stack/lib:/stacks/$stack/lib:ro" \
+    -v "$abs/work/AGENTS.md:/work/AGENTS.md:ro" \
+    -v "$abs/work/CLAUDE.md:/work/CLAUDE.md:ro" \
+    -v "$abs/work/.claude:/work/.claude:ro" \
+    -v "$abs/home:/home/agent" \
+    --env-file "$abs/env" \
+    ${AGENT_ANTHROPIC_API_KEY:+-e "ANTHROPIC_API_KEY=$AGENT_ANTHROPIC_API_KEY"} \
+    ${AGENT_CLAUDE_CODE_OAUTH_TOKEN:+-e "CLAUDE_CODE_OAUTH_TOKEN=$AGENT_CLAUDE_CODE_OAUTH_TOKEN"} \
+    --label "stackfast.agent=$slug/$name" \
+    "$(agent_image "$stack")" >/dev/null
+  docker network connect "$c" "$PROXY" 2>/dev/null || true
+  "$ROOT/bin/proxy" >/dev/null
+  say agent "$slug/$name démarré — preview : $(agent_url "$slug" "$name")"
+}
+
+stop() {
+  c="$(agent_container "$1" "$2")"
+  docker network disconnect "$c" "$PROXY" >/dev/null 2>&1 || true
+  docker rm -f "$c" >/dev/null 2>&1 || true
+  docker network rm "$c" >/dev/null 2>&1 || true
+  "$ROOT/bin/proxy" >/dev/null
+}
+
+# Fichiers qui diffèrent entre la base et la copie de l'agent (chemins relatifs à l'app).
+changed_files() {
+  ad="$(agent_dir "$1" "$2")"; stack="$(agent_meta "$1" "$2" stack)"
+  w="$ad/work/apps/$stack/$1"
+  # shellcheck disable=SC2086
+  diff -rq $EXCL "$ad/base" "$w" 2>/dev/null | sed -e "s#^Only in $ad/base\(.*\): #D \1/#" -e "s#^Only in $w\(.*\): #A \1/#" \
+    -e "s#^Files $ad/base/\(.*\) and .* differ#M /\1#" | sed -e 's#^\([ADM]\) /*/*#\1 #' -e 's#//*#/#g'
+}
+
+cmd="${1:-}"; [ $# -gt 0 ] && shift
+case "$cmd" in
+  new)
+    with_data=0; slug="${1:-}"; [ -n "$slug" ] || usage; shift
+    names=""
+    for a in "$@"; do
+      case "$a" in --with-data) with_data=1 ;; *) names="$names $a" ;; esac
+    done
+    [ -n "$names" ] || usage
+    stack="$(app_stack "$slug")"
+    ensure_gitignore
+    git rev-parse --git-dir >/dev/null 2>&1 && [ -n "$(git status --porcelain "apps/$stack/$slug" 2>/dev/null)" ] \
+      && echo "note : l'app a des changements non commités ; les agents partent de l'état actuel du dossier."
+    for name in $names; do
+      echo "$name" | grep -Eq "$VALID" || die "nom invalide : $name ([a-z0-9-], ex. a1)"
+      [ -e "$(agent_dir "$slug" "$name")" ] && die "agent déjà créé : $slug/$name (stackfast agent start $slug $name)"
+    done
+    for name in $names; do
+      prepare "$slug" "$name" "$stack" "$with_data"
+      start "$slug" "$name"
+    done
+    ;;
+  start) [ $# -eq 2 ] || usage; start "$1" "$2" ;;
+  stop)  [ $# -eq 2 ] || usage; need_agent "$1" "$2"; stop "$1" "$2"; say arrêté "$1/$2 (fichiers conservés ; stackfast agent start)" ;;
+  ls)
+    [ -n "$(agents)" ] || { echo "aucun agent (stackfast agent new <slug> <nom>)"; exit 0; }
+    printf '%-14s %-10s %-10s %-9s %s\n' APP AGENT ÉTAT CHANGÉS PREVIEW
+    agents | while read -r slug name; do
+      state=arrêté; agent_running "$slug" "$name" && state="actif"
+      [ -f "$(agent_dir "$slug" "$name")/home/run.status" ] && state="$state/$(cat "$(agent_dir "$slug" "$name")/home/run.status")"
+      printf '%-14s %-10s %-10s %-9s %s\n' "$slug" "$name" "$state" "$(changed_files "$slug" "$name" | wc -l | tr -d ' ')" "$(agent_url "$slug" "$name")"
+    done
+    ;;
+  diff)
+    [ $# -eq 2 ] || usage; need_agent "$1" "$2"
+    stack="$(agent_meta "$1" "$2" stack)"; ad="$(agent_dir "$1" "$2")"
+    # shellcheck disable=SC2086
+    diff -ruN $EXCL "$ad/base" "$ad/work/apps/$stack/$1" || true
+    ;;
+  apply)
+    [ $# -eq 2 ] || usage; need_agent "$1" "$2"
+    slug="$1"; name="$2"; stack="$(agent_meta "$slug" "$name" stack)"
+    ad="$(agent_dir "$slug" "$name")"; w="$ad/work/apps/$stack/$slug"; b="$ad/base"; dest="apps/$stack/$slug"
+    # Un lien symbolique écrit par l'agent pourrait pointer hors de l'app : on refuse tout.
+    links="$(find "$w" -type l -not -path "$w/data/*" -not -path "$w/vendor/*" 2>/dev/null)"
+    [ -z "$links" ] || die "liens symboliques dans la copie de l'agent (refusés) :
+$links"
+    list="$(changed_files "$slug" "$name")"
+    [ -n "$list" ] || { echo "rien à appliquer : $slug/$name n'a rien changé"; exit 0; }
+    case "$list" in *../*|*" /"*) die "chemin suspect dans les changements de l'agent :
+$list" ;; esac
+    conflicts=0
+    tmp="$(mktemp)"
+    echo "$list" | { while read -r kind f; do
+      d="$dest/$f"
+      text=1; { [ -f "$w/$f" ] && ! grep -Iq . "$w/$f" && [ -s "$w/$f" ]; } && text=0
+      case "$kind" in
+        A)
+          if [ -f "$d" ] && ! cmp -s "$d" "$w/$f"; then
+            : > "$tmp"; cp "$d" "$tmp.d"
+            if [ "$text" = 1 ]; then
+              git merge-file -L instance -L base -L "agent-$name" "$tmp.d" "$tmp" "$w/$f" || conflicts=$((conflicts + 1))
+              cp "$tmp.d" "$d"; echo "A! $f (existe déjà, marqué)"
+            else echo "C  $f (binaire, existe déjà : ignoré)"; conflicts=$((conflicts + 1)); fi
+          else mkdir -p "$(dirname "$d")"; cp -p "$w/$f" "$d"; echo "A  $f"; fi ;;
+        D)
+          if [ ! -f "$d" ]; then echo "D  $f (déjà absent)"
+          elif cmp -s "$d" "$b/$f"; then rm -f "$d"; echo "D  $f"
+          else echo "C  $f (supprimé par l'agent mais modifié depuis : conservé)"; conflicts=$((conflicts + 1)); fi ;;
+        M)
+          if [ ! -f "$d" ]; then mkdir -p "$(dirname "$d")"; cp -p "$w/$f" "$d"; echo "M! $f (absent de l'instance : recréé)"; conflicts=$((conflicts + 1))
+          elif cmp -s "$d" "$b/$f"; then cp -p "$w/$f" "$d"; echo "M  $f"
+          elif [ "$text" = 1 ]; then
+            cp "$d" "$tmp.d"
+            if git merge-file -L instance -L base -L "agent-$name" "$tmp.d" "$b/$f" "$w/$f"; then echo "M+ $f (fusionné avec des changements concurrents)"
+            else echo "C  $f (CONFLIT : marqueurs <<<<<<< dans le fichier)"; conflicts=$((conflicts + 1)); fi
+            cp "$tmp.d" "$d"
+          else echo "C  $f (binaire modifié des deux côtés : conservé)"; conflicts=$((conflicts + 1)); fi ;;
+      esac
+    done
+    echo "$conflicts" > "$tmp.c"; }
+    conflicts="$(cat "$tmp.c")"; rm -f "$tmp" "$tmp.d" "$tmp.c"
+    # La base devient l'état de l'agent : un second apply ne rejoue pas ces changements.
+    rm -rf "$b"; mkdir -p "$b"; cp -a "$w/." "$b/"; rm -rf "$b/data" "$b/.git"
+    echo
+    if [ "$conflicts" -gt 0 ]; then
+      say conflits "$conflicts fichier(s) à résoudre à la main (lignes C et marqueurs) avant de commiter"
+    fi
+    say appliqué "dans $dest — relis (git diff), stackfast check $slug, puis commit"
+    ;;
+  run)
+    [ $# -ge 3 ] || usage; slug="$1"; name="$2"; shift 2
+    follow=0; [ "$1" = --follow ] && { follow=1; shift; }
+    need_agent "$slug" "$name"
+    agent_running "$slug" "$name" || start "$slug" "$name"
+    c="$(agent_container "$slug" "$name")"; ad="$(agent_dir "$slug" "$name")"
+    run="$(date +%Y%m%d-%H%M%S)"
+    mkdir -p "$ad/home/runs"; echo running > "$ad/home/run.status"
+    # Autonomie : la sandbox est la frontière (pas de docker, pas d'autres apps, pas de secrets), donc pas de confirmations.
+    docker exec -d -w /work "$c" sh -c \
+      'claude -p "$1" --dangerously-skip-permissions > "/home/agent/runs/$2.log" 2>&1; echo $? > /home/agent/run.status' sh "$*" "$run"
+    echo "$run" > "$ad/home/runs/latest"
+    say lancé "$slug/$name (log : stackfast agent logs $slug $name)"
+    if [ "$follow" = 1 ]; then
+      sleep 2; tail -f "$ad/home/runs/$run.log" & tp=$!
+      while [ "$(cat "$ad/home/run.status")" = running ]; do sleep 2; done
+      kill "$tp" 2>/dev/null; echo "terminé : code $(cat "$ad/home/run.status")"
+    fi
+    ;;
+  logs)
+    [ $# -eq 2 ] || usage; need_agent "$1" "$2"; ad="$(agent_dir "$1" "$2")"
+    [ -f "$ad/home/runs/latest" ] || die "aucune exécution (stackfast agent run)"
+    echo "== $(cat "$ad/home/run.status" 2>/dev/null) — $(cat "$ad/home/runs/latest")"
+    cat "$ad/home/runs/$(cat "$ad/home/runs/latest").log"
+    ;;
+  shell)
+    [ $# -ge 2 ] || usage; slug="$1"; name="$2"; shift 2
+    need_agent "$slug" "$name"
+    agent_running "$slug" "$name" || start "$slug" "$name"
+    [ $# -gt 0 ] || set -- claude
+    flags=-i; [ -t 0 ] && flags=-it
+    exec docker exec $flags -w /work "$(agent_container "$slug" "$name")" "$@"
+    ;;
+  rm)
+    [ $# -ge 2 ] || usage; need_agent "$1" "$2"
+    if [ "${3:-}" != --force ] && [ -n "$(changed_files "$1" "$2")" ]; then
+      die "$1/$2 a des changements non appliqués (stackfast agent diff $1 $2). --force pour supprimer quand même."
+    fi
+    stop "$1" "$2"
+    # Les fichiers de la sandbox appartiennent à HOST_UID ; rm suffit.
+    rm -rf "$(agent_dir "$1" "$2")"
+    rmdir "$AGENTS_DIR/$1" 2>/dev/null || true
+    say supprimé "$1/$2"
+    ;;
+  passwd) rm -f proxy/preview-auth; set_preview_password; "$ROOT/bin/proxy" ;;
+  ""|-h|--help|help) usage 0 ;;
+  *) usage ;;
+esac

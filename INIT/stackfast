@@ -21,6 +21,7 @@ Dans une instance (n'importe quel sous-dossier) — les apps :
   audit                   sécurité : version PHP servie vs dernier correctif, apps sur une ancienne image
   update [<stack>|proxy]  reconstruit avec le dernier correctif, teste toutes les apps, bascule
   rollback <stack>        revient à l'image précédente
+  agent <verbe> …         agents isolés sur une app : new, run, shell, ls, diff, apply, stop, rm (stackfast agent --help)
   deploy                  git pull + up --all (sur le VPS)
   proxy                   régénère et recharge Caddy
   migrate <stack> <slug>  passe une app de l'ancien conteneur partagé à son propre conteneur
@@ -139,7 +140,7 @@ sync_owned() {
   for f in proxy/Caddyfile proxy/domains; do
     [ -e "$dest/$f" ] || { mkdir -p "$dest/proxy"; cp "$SRC/instance/$f" "$dest/$f"; echo "créé       : $f"; }
   done
-  owned="$( cd "$SRC/instance" && { find bin .claude -type f; echo proxy/compose.yml; } | sort )"
+  owned="$( cd "$SRC/instance" && { find bin .claude agent -type f; echo proxy/compose.yml; } | sort )"
   if [ "$force" -eq 0 ]; then
     if [ -f "$dest/$SUMS" ]; then
       changed="$( cd "$dest" && sha256sum -c --quiet "$SUMS" 2>/dev/null | cut -d: -f1 )"
@@ -186,8 +187,14 @@ cmd_sync() {
       fi
     fi
     mkdir -p "$d"
-    find "$d" -mindepth 1 -maxdepth 1 ! -name vendor -exec rm -rf {} +
+    # Mise à jour sur place : les dossiers gardent leur identité (lib/ est monté dans les conteneurs en marche ;
+    # le supprimer-recréer casserait ces montages jusqu'au prochain `stackfast up`). Vendor reste intact.
+    find "$d" -path "$d/vendor" -prune -o -type f -exec rm -f {} +
+    find "$d" -path "$d/vendor" -prune -o -type l -exec rm -f {} +
     cp -R "$stack". "$d/"
+    ( cd "$d" && find . -mindepth 1 -type d ! -path './vendor' ! -path './vendor/*' ) | while read -r sub; do
+      [ -d "$stack$sub" ] || rm -rf "$d/$sub"
+    done
     sums "$d" > "$d/$SUMS"
     echo "stack      : stacks/$name (synchronisée)"
   done
@@ -200,7 +207,8 @@ cmd_instance() {
   while [ "$dir" != / ] && [ ! -f "$dir/bin/lib.sh" ]; do dir="$(dirname "$dir")"; done
   [ -f "$dir/bin/lib.sh" ] || die "$name : à lancer dans une instance (aucun bin/lib.sh au-dessus de $PWD)"
   [ -x "$dir/bin/$name" ] || die "$name : commande absente de l'instance ($dir/bin/$name) — stackfast sync ?"
-  exec "$dir/bin/$name" "$@"
+  # Le client sait où est le hub : les commandes d'instance y trouvent la méthode (CLAUDE.global.md) pour les sandboxes d'agents.
+  STACKFAST_HOME="$HUB" exec "$dir/bin/$name" "$@"
 }
 
 cmd="${1:-}"
@@ -214,7 +222,7 @@ case "$cmd" in
   init)    cmd_init "$@" ;;
   sync)    cmd_sync "$@" ;;
   new-app) cmd_instance new "$@" ;;
-  new|ls|domain|check|up|down|logs|shell|audit|update|rollback|deploy|proxy|migrate)
+  new|ls|domain|check|up|down|logs|shell|audit|update|rollback|deploy|proxy|migrate|agent)
            cmd_instance "$cmd" "$@" ;;
   *)       usage ;;
 esac

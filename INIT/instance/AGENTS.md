@@ -13,6 +13,7 @@
 - **voir l'état** → `stackfast ls` (apps, santé, adresses) ; `stackfast logs <slug>` (erreurs PHP comprises).
 - **donner une adresse à une app** → `stackfast domain <slug> <domaine>` : le domaine devient l'adresse, l'ancien chemin et les anciens domaines redirigent (301). Zéro changement de code. Ne modifie pas `proxy/generated.caddy`.
 - **appliquer un correctif de sécurité** (PHP, Caddy) → `stackfast update` puis `stackfast audit`. Voir `docs/SECURITE.md` du hub.
+- **faire travailler des agents sur une app** → `stackfast agent new <slug> a1 a2…` puis `agent run` ou `agent shell`, `agent diff`, `agent apply`. Chaque agent est isolé (sa copie, son conteneur, sa preview). Relis le diff avant `apply`, puis `stackfast check <slug>`. Voir `docs/AGENTS-ISOLES.md` du hub. Un agent ne lit jamais d'autre app ni de `.env` ; toi non plus quand tu travailles dans sa sandbox.
 - **déployer** → `stackfast deploy` (git pull + toutes les apps + proxy).
 - **ajouter un secret** → `.env` de l'app (gitignoré), puis `stackfast up <slug>`. Le `.env` de l'instance ne contient que des réglages d'instance.
 - **ajouter un conteneur à une app** (base de données, worker…) → seulement si l'architecture l'impose : un service dans le `compose.yml` de l'app (modèle commenté), réseau `back`, une décision dans l'`AGENTS.md` de l'app.
@@ -23,7 +24,7 @@
 
 - Ne modifie pas `stacks/`, `bin/`, `.claude/` (sauf `settings.local.json`), `proxy/compose.yml` : ils appartiennent au hub `stackfast`. Une règle de stack se propose via `/retro`, s'écrit dans le hub, puis `stackfast pull && stackfast sync` est lancé ici.
 - Ne partage rien entre deux apps autrement que par la stack. Une app n'inclut pas les fichiers d'une autre, ne joint pas son conteneur.
-- Ne commite jamais `.env`, `data/`, `PLAN.md`, `proxy/generated.caddy`.
+- Ne commite jamais `.env`, `data/`, `PLAN.md`, `proxy/generated.caddy`, `.agents/`.
 
 ## Lessons de l'instance
 
