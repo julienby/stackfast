@@ -57,4 +57,5 @@
 - 2026-09-16 — ne jamais déclarer en autoload `files` un fichier qui charge lui-même `vendor/autoload.php` et qui est aussi `require`d par l'app : boucle de redéclaration (`Cannot redeclare function`). (erreur observée : `bootstrap.php` en autoload `files` + `require` explicite → fatal.)
 - 2026-09-16 — toujours garder un guard explicite contre les chaînes vides avant un `hash_equals()` de token : vide == vide passe sinon. (erreur observée : `csrf_check()` acceptait une requête sans cookie ni token.)
 - 2026-09-29 — Mettre à jour les tests de rendu avec les vues qu’ils décrivent. (erreur observée : les tests du squelette sont restés après son remplacement.)
+- 2026-10-23 — l'image amont FrankenPHP pose `NET_BIND_SERVICE` sur le binaire : avec `cap_drop: ALL`, le conteneur redémarre en boucle (`exec: frankenphp: Operation not permitted`). Le Dockerfile retire la capability (`setcap -r`) ; ne jamais passer à `cap_add` pour contourner. (erreur observée : premier démarrage sous Docker, conteneur « unhealthy ».)
 - format : `- YYYY-MM-DD — règle. (erreur observée : ...)`. Ajoutées dans le hub uniquement.

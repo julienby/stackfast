@@ -6,6 +6,6 @@
 printf '%-20s %-10s %-20s %s\n' APP STACK ÉTAT ADRESSE
 apps | while read -r stack slug; do
   state="$(docker inspect -f '{{.State.Status}}{{if .State.Health}} {{.State.Health.Status}}{{end}}' \
-    "$(app_container "$slug")" 2>/dev/null || echo arrêtée)"
-  printf '%-20s %-10s %-20s %s\n' "$slug" "$stack" "$state" "$(app_url "$slug")"
+    "$(app_container "$slug")" 2>/dev/null | head -1 || true)"
+  printf '%-20s %-10s %-20s %s\n' "$slug" "$stack" "${state:-arrêtée}" "$(app_url "$slug")"
 done
