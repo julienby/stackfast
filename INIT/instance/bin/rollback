@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+# Revient à l'image précédente d'une stack (celle d'avant le dernier update) et recrée ses apps.
+#   bin/rollback <stack>
+. "$(dirname "$0")/lib.sh"
+
+STACK="${1:?usage: stackfast rollback <stack>}"
+img="$(image "$STACK")"
+docker image inspect "$img:previous" >/dev/null 2>&1 || die "pas d'image précédente pour $STACK"
+docker tag "$img:current" "$img:swap"
+docker tag "$img:previous" "$img:current"
+docker tag "$img:swap" "$img:previous"
+docker rmi "$img:swap" >/dev/null
+apps "$STACK" | while read -r s slug; do
+  compose_app "$slug" up -d --force-recreate --wait --wait-timeout 60 || echo "ATTENTION : $slug n'est pas saine" >&2
+  say revenue "$slug"
+done
+echo "Attention : l'image précédente peut contenir une faille corrigée depuis. stackfast audit."

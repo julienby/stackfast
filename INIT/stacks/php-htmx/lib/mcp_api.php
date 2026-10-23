@@ -5,7 +5,7 @@ declare(strict_types=1);
 
 namespace Stack;
 
-/** Nom de la variable du token : mon-app → MON_APP_API_TOKEN (même règle que bin/new-app). */
+/** Nom de la variable du token : mon-app → MON_APP_API_TOKEN (même règle que bin/new). */
 function token_env(string $slug): string
 {
     return strtoupper(str_replace('-', '_', $slug)) . '_API_TOKEN';

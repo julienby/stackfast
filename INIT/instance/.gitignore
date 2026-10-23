@@ -2,4 +2,4 @@ PLAN.md
 .env
 apps/*/*/data/*
 !apps/*/*/data/.gitkeep
-stacks/*/vendor/
+proxy/generated.caddy*

@@ -1,0 +1,71 @@
+#!/usr/bin/env sh
+# Met à jour la stack (image reconstruite avec le dernier correctif PHP) et bascule ses apps, ou le proxy.
+#   bin/update                 toutes les stacks utilisées + le proxy
+#   bin/update <stack>         une stack
+#   bin/update proxy           l'image Caddy du proxy
+#   bin/update --build-only <stack>   construit seulement (appelé par bin/up quand l'image manque ou a changé)
+# Faille PHP publiée → `stackfast update`, puis `stackfast audit` : c'est toute la procédure.
+# Ordre sûr : construire :next → tester toutes les apps avec :next → :current devient :previous → :next devient
+# :current → recréer les apps. Un test rouge arrête tout avant la bascule ; `stackfast rollback <stack>` revient.
+. "$(dirname "$0")/lib.sh"
+
+build_only=0
+[ "${1:-}" = --build-only ] && { build_only=1; shift; }
+
+build() {
+  img="$(image "$1")"
+  echo "== construction $img (base $(stack_conf "$1" BASE_IMAGE), --pull)"
+  docker build --pull \
+    --build-arg "BASE_IMAGE=$(stack_conf "$1" BASE_IMAGE)" \
+    --label "stackfast.context=$(context_hash "$1")" \
+    -t "$img:next" "stacks/$1"
+}
+
+promote() {
+  img="$(image "$1")"
+  docker image inspect "$img:current" >/dev/null 2>&1 && docker tag "$img:current" "$img:previous"
+  docker tag "$img:next" "$img:current"
+  docker tag "$img:next" "$img:$(date +%Y%m%d-%H%M)"
+  docker rmi "$img:next" >/dev/null
+}
+
+update_stack() {
+  stack="$1"
+  build "$stack"
+  if [ -n "$(apps "$stack")" ]; then
+    echo "== tests de toutes les apps $stack avec la nouvelle image"
+    IMAGE="$(image "$stack"):next" "$ROOT/bin/check" "$stack" \
+      || { docker rmi "$(image "$stack"):next" >/dev/null; die "tests rouges : rien n'a changé, les apps tournent toujours sur l'ancienne image"; }
+  fi
+  promote "$stack"
+  apps "$stack" | while read -r s slug; do
+    compose_app "$slug" up -d --force-recreate --wait --wait-timeout 60 \
+      || echo "ATTENTION : $slug n'est pas saine après la bascule → stackfast logs $slug, ou stackfast rollback $stack" >&2
+    say basculée "$slug"
+  done
+}
+
+update_proxy() {
+  docker compose --env-file .env -f proxy/compose.yml pull
+  docker compose --env-file .env -f proxy/compose.yml up -d
+  "$ROOT/bin/proxy"
+}
+
+if [ "$build_only" -eq 1 ]; then
+  stack="${1:?usage: bin/update --build-only <stack>}"
+  build "$stack"
+  promote "$stack"
+  exit 0
+fi
+
+if [ $# -eq 0 ]; then
+  set -- $(apps | cut -d' ' -f1 | sort -u) proxy
+fi
+for target in "$@"; do
+  case "$target" in
+    proxy) update_proxy ;;
+    *)     update_stack "$target" ;;
+  esac
+done
+echo
+exec "$ROOT/bin/audit"

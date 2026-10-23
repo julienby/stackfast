@@ -1,0 +1,92 @@
+#!/usr/bin/env sh
+# Régénère proxy/generated.caddy depuis les apps et proxy/domains, valide, puis recharge Caddy sans coupure.
+# Démarre le proxy s'il ne tourne pas et le relie au réseau de chaque app. Lancé par up, new, domain, deploy.
+#   Sans domaine        : https://$APPS_HOST/<slug>/       (X-Base-Path /<slug>)
+#   Avec domaine(s)     : https://<premier domaine>/        (X-Base-Path /), les autres et l'ancien chemin redirigent (301)
+. "$(dirname "$0")/lib.sh"
+
+OUT=proxy/generated.caddy
+
+generate() {
+  echo "# Généré par bin/proxy — ne pas éditer : stackfast domain <slug> <domaine>, puis tes blocs à la main dans proxy/Caddyfile."
+  echo
+  echo "(stackfast_app) {"
+  echo "	request_body {"
+  echo "		max_size 32MB"
+  echo "	}"
+  echo "	header {"
+  echo "		X-Content-Type-Options nosniff"
+  echo "		Referrer-Policy strict-origin-when-cross-origin"
+  echo "		X-Frame-Options SAMEORIGIN"
+  echo "	}"
+  echo "	reverse_proxy {args[0]} {"
+  echo "		header_up X-Base-Path {args[1]}"
+  echo "	}"
+  echo "}"
+
+  if [ -n "${APPS_HOST:-}" ]; then
+    echo
+    echo "$APPS_HOST {"
+    apps | while read -r stack slug; do
+      upstream="$(app_container "$slug"):$(stack_conf "$stack" PORT)"
+      main="$(domains "$slug" | head -1)"
+      if [ -n "$main" ]; then
+        echo "	redir /$slug https://$main/ 301"
+        echo "	handle_path /$slug/* {"
+        echo "		redir https://$main{uri} 301"
+        echo "	}"
+      else
+        echo "	redir /$slug /$slug/ 308"
+        echo "	handle_path /$slug/* {"
+        echo "		import stackfast_app $upstream /$slug"
+        echo "	}"
+      fi
+    done
+    echo "	handle {"
+    echo "		respond \"Aucune app ici.\" 404"
+    echo "	}"
+    echo "}"
+  fi
+
+  apps | while read -r stack slug; do
+    upstream="$(app_container "$slug"):$(stack_conf "$stack" PORT)"
+    main=""
+    for d in $(domains "$slug"); do
+      echo
+      if [ -z "$main" ]; then
+        main="$d"
+        echo "$d {"
+        echo "	import stackfast_app $upstream /"
+        echo "}"
+      else
+        echo "$d {"
+        echo "	redir https://$main{uri} 301"
+        echo "}"
+      fi
+    done
+  done
+}
+
+[ -f proxy/Caddyfile ] || die "proxy/Caddyfile manquant (stackfast sync ou copie de proxy/ depuis le hub)"
+[ -f "$OUT" ] && cp "$OUT" "$OUT.bak"
+generate > "$OUT.new"
+mv "$OUT.new" "$OUT"
+
+docker compose --env-file .env -f proxy/compose.yml up -d >/dev/null 2>&1 \
+  || docker compose --env-file .env -f proxy/compose.yml up -d
+
+# Le proxy rejoint le réseau de chaque app démarrée : il est le seul à les voir toutes.
+apps | while read -r stack slug; do
+  net="$INSTANCE-$slug"
+  docker network inspect "$net" >/dev/null 2>&1 || continue
+  docker network connect "$net" "$PROXY" 2>/dev/null || true
+done
+
+if ! docker exec "$PROXY" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
+  docker exec "$PROXY" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 | tail -5 >&2
+  [ -f "$OUT.bak" ] && mv "$OUT.bak" "$OUT"
+  die "config Caddy invalide, l'ancienne est conservée (proxy/Caddyfile ou proxy/domains à corriger)"
+fi
+docker exec "$PROXY" caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+rm -f "$OUT.bak"
+say proxy "rechargé ($(apps | wc -l | tr -d ' ') app(s))"

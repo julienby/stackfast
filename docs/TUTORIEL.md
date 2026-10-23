@@ -13,8 +13,8 @@ Plan :
 6. Anatomie d'une app php-htmx
 7. Une requête, de bout en bout
 8. `/api` et `/mcp`
-9. Vérifier : `bin/check` et le hook
-10. Déployer derrière un proxy
+9. Vérifier : `stackfast check` et le hook
+10. Un conteneur par app, un Caddy devant
 11. Faire vivre les règles (Lessons)
 12. Synchroniser : `pull`, `push`, `sync`
 13. Choisir le modèle
@@ -31,7 +31,7 @@ Sans système, tu la corriges **encore** la semaine suivante, dans un autre proj
 stackfast règle ce problème avec trois choses :
 
 - **Des règles écrites**, dans des fichiers que l'IA lit au début de chaque session.
-- **Une preuve automatique** : `bin/check` lance les tests. Un hook le relance à chaque fin de tour.
+- **Une preuve automatique** : `stackfast check` lance les tests. Un hook le relance à chaque fin de tour.
 - **Une boucle** : chaque erreur corrigée devient une règle d'une ligne (une *Lesson*), au bon niveau.
 
 Le repo `stackfast` est le **hub**. Il ne contient aucune app. Il contient :
@@ -118,28 +118,27 @@ Contenu d'une instance :
 mon-vps/
 ├── AGENTS.md          contrat du VPS (CLAUDE.md = lien vers lui)
 ├── DECISIONS.md       une ligne par arbitrage
-├── .env               secrets (gitignoré), copié depuis .env.example
-├── bin/
-│   ├── new-app        crée une app depuis le gabarit
-│   ├── check          lint + tests
-│   └── deploy         git pull + docker compose up
+├── .env               réglages de l'instance (gitignoré), copié depuis .env.example
+├── bin/               les commandes de `stackfast` (new, ls, domain, check, audit, update…)
 ├── .claude/
 │   ├── settings.json  déclare le hook Stop
 │   ├── hooks/verify.sh
 │   └── commands/      /new-app, /feature, /retro
-├── proxy/             exemples Caddy et nginx
+├── proxy/
+│   ├── compose.yml    le Caddy de l'instance (appartient au hub)
+│   ├── Caddyfile      ta config, importe generated.caddy
+│   └── domains        une ligne par app qui a un domaine
 ├── stacks/php-htmx/   posé par sync, appartient au hub
-└── apps/php-htmx/     tes apps
+└── apps/php-htmx/     tes apps, chacune avec son compose.yml et son .env
 ```
 
-Réglages de `.env` :
+Réglages de `.env` (instance seulement : les secrets d'une app sont dans son propre `.env`) :
 
 | Variable | Rôle |
 |---|---|
-| `PROXY_NETWORK` | réseau Docker du proxy (défaut `caddy-net`) |
-| `HOST_UID`, `HOST_GID` | ton utilisateur (`id -u`, `id -g`). Apache tourne sous cet UID : les fichiers de `data/` t'appartiennent. |
-| `PHP_HTMX_CONTAINER` | nom du conteneur |
-| `<SLUG>_API_TOKEN` | un par app, ajouté par `bin/new-app` |
+| `STACKFAST_INSTANCE` | préfixe des conteneurs, réseaux, images (défaut `main`) |
+| `APPS_HOST` | hôte des apps en incubation : `https://$APPS_HOST/<slug>/` |
+| `HOST_UID`, `HOST_GID` | ton utilisateur (`id -u`, `id -g`). Les conteneurs tournent sous cet uid : les fichiers de `data/` t'appartiennent. |
 
 Piège connu : `init` ne remplace jamais un fichier existant. Si le hub change `INIT/instance/AGENTS.md`, ton instance garde l'ancien. Reporte la modif à la main si tu la veux.
 
@@ -155,11 +154,11 @@ Dans l'instance, lance Claude Code, puis :
 
 Claude suit `.claude/commands/new-app.md` :
 
-1. Il lance `bin/new-app php-htmx mon-app`.
+1. Il lance `stackfast new php-htmx mon-app`.
    - Le gabarit est copié dans `apps/php-htmx/mon-app/`, `__SLUG__` est remplacé.
-   - Le token `MON_APP_API_TOKEN` est ajouté à `.env`.
-   - Le bloc proxy à coller est affiché.
-2. Il lance `bin/check php-htmx mon-app`. Le gabarit doit être vert.
+   - Le token `MON_APP_API_TOKEN` est écrit dans `apps/php-htmx/mon-app/.env`.
+   - Le conteneur démarre, le proxy est rechargé, l'adresse est affichée.
+2. Il lance `stackfast check mon-app`. Le gabarit doit être vert.
 3. Il ouvre `PRD.md` et te pose les questions, **une par une**. Il ne remplit rien seul.
 4. Il suit « Première session » de l'`AGENTS.md` de l'app.
 
@@ -175,7 +174,7 @@ Ensuite, une feature à la fois :
 2. Plan dans `PLAN.md`, tu valides.
 3. **Tests d'abord** : le métier sans HTTP, puis le HTML rendu.
 4. Le minimum de code pour passer les tests.
-5. `bin/check` vert, sortie citée, diff montré, ce qui n'est pas testé est dit.
+5. `stackfast check` vert, sortie citée, diff montré, ce qui n'est pas testé est dit.
 6. `/retro`.
 
 ---
@@ -195,8 +194,10 @@ apps/php-htmx/mon-app/
 │   ├── layout.php  page complète
 │   ├── home.php
 │   └── partials/   fragments htmx
-├── data/           JSON (jamais servi par Apache)
-└── tests/          *_test.php, lancés par bin/check
+├── compose.yml     son conteneur (base dans la stack)
+├── .env            ses secrets (gitignoré)
+├── data/           JSON + sessions (jamais servi)
+└── tests/          *_test.php, lancés par stackfast check
 ```
 
 La règle la plus importante : **le métier vit dans `lib/`, en fonctions pures.**
@@ -229,19 +230,19 @@ Une app ne copie jamais ces helpers. Elle fait `use function Stack\{url, render,
 
 ## 7. Une requête, de bout en bout
 
-Tu tapes `https://web.example.com/mon-app/` dans le navigateur.
+Tu tapes `https://apps.example.com/mon-app/` dans le navigateur.
 
 ```
 navigateur
    │  GET /mon-app/
    ▼
-proxy (Caddy / nginx)      efface le header X-Base-Path venant du client
-   │
+proxy de l'instance (Caddy)   TLS ; retire /mon-app du chemin ; pose X-Base-Path: /mon-app (écrase celui du client)
+   │  réseau privé de l'app
    ▼
-conteneur php:8.5-apache   DocumentRoot = apps/php-htmx
-   │  .htaccess : tout vers index.php, sauf lib/ views/ data/ tests/ (403)
+conteneur main-mon-app        FrankenPHP, app montée en /app
+   │  Caddyfile de la stack : tout vers index.php, sauf lib/ views/ data/ tests/ (404)
    ▼
-mon-app/index.php
+index.php
    │  path() = "/"   method() = "GET"
    │  route "GET /" → items_list() → render('home')
    ▼
@@ -266,10 +267,10 @@ L'app ne connaît jamais son domaine ni son préfixe.
 
 | Accès | Le proxy envoie | `url('/items')` donne |
 |---|---|---|
-| `web.example.com/mon-app/` | rien (header effacé) | `/mon-app/items` |
+| `apps.example.com/mon-app/` | `X-Base-Path: /mon-app` | `/mon-app/items` |
 | `mon-app.example.com/` | `X-Base-Path: /` | `/items` |
 
-Sans header, `base_path()` déduit le préfixe du chemin du script. Passer une app sur son propre domaine = un bloc dans le proxy, **zéro** changement de code.
+Passer une app sur son propre domaine = `stackfast domain mon-app mon-app.example.com`, **zéro** changement de code ; l'ancienne adresse redirige.
 
 Le proxy doit **toujours** effacer ou écraser ce header. Sinon un client choisit lui-même les liens de la page.
 
@@ -293,12 +294,12 @@ slug en majuscules, "-" devient "_", puis "_API_TOKEN"
 mon-app → MON_APP_API_TOKEN
 ```
 
-`bin/new-app` l'écrit dans `.env`. Le conteneur lit `.env` au démarrage : après un changement, relance `bin/deploy php-htmx`.
+`stackfast new` l'écrit dans le `.env` de l'app. Le conteneur le lit au démarrage : après un changement, `stackfast up mon-app`.
 
 ```sh
-TOKEN=$(grep MON_APP_API_TOKEN .env | cut -d= -f2)
-curl https://web.example.com/mon-app/api                                   # 401
-curl -H "Authorization: Bearer $TOKEN" https://web.example.com/mon-app/api # 200
+TOKEN=$(grep MON_APP_API_TOKEN apps/php-htmx/mon-app/.env | cut -d= -f2)
+curl https://apps.example.com/mon-app/api                                   # 401
+curl -H "Authorization: Bearer $TOKEN" https://apps.example.com/mon-app/api # 200
 ```
 
 Token vide ou absent dans `.env` → 401 pour tout le monde. C'est voulu.
@@ -341,7 +342,7 @@ Test à la main :
 ```sh
 curl -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
-  https://web.example.com/mon-app/mcp
+  https://apps.example.com/mon-app/mcp
 ```
 
 Remarque : les deux exemples appellent `items_list()`, la même fonction que l'interface. C'est le bénéfice du métier pur : une surface de plus = un adaptateur de trois lignes.
@@ -350,22 +351,20 @@ Le dispatch lui-même vit dans la stack (`stacks/php-htmx/lib/mcp_api.php`). Une
 
 ---
 
-## 9. Vérifier : `bin/check` et le hook
+## 9. Vérifier : `stackfast check` et le hook
 
 ```sh
-bin/check                   # toutes les stacks
-bin/check php-htmx          # une stack
-bin/check php-htmx mon-app  # une app
+stackfast check             # toutes les apps
+stackfast check php-htmx    # une stack
+stackfast check mon-app     # une app
 ```
 
-`bin/check` fait deux choses :
+Pour chaque app, un conteneur jetable de l'image de la stack (sans réseau, lecture seule sauf l'app) fait deux choses :
 
-1. `php -l` sur chaque fichier PHP de la stack et de l'app.
+1. `php -l` sur chaque fichier PHP de la lib de la stack et de l'app.
 2. Chaque `tests/*_test.php`.
 
-Sortie : `CHECK OK` et exit 0, ou `CHECK FAILED` et exit 1.
-
-Si `php` n'est pas installé sur l'hôte (cas d'un VPS), `bin/check` lance php **dans le conteneur**. Il traduit chaque chemin : `apps/php-htmx/...` devient `/var/www/html/...`. Le conteneur doit donc tourner.
+Exit 0 si tout est vert, 1 sinon. Pas besoin de php sur l'hôte, ni que l'app tourne.
 
 ### Le hook de fin de tour
 
@@ -374,48 +373,47 @@ Si `php` n'est pas installé sur l'hôte (cas d'un VPS), `bin/check` lance php *
 | Situation | Résultat |
 |---|---|
 | rien de changé dans `apps/` ni `stacks/` | rien ne tourne |
+| une app changée | seulement cette app est vérifiée ; `stacks/` changé → toutes |
 | changement, tests verts | rien à signaler |
 | changement, tests rouges | exit 2 : Claude est bloqué et lit la sortie |
 | déjà bloqué une fois dans ce tour | Claude peut s'arrêter (pas de boucle) |
 
 Ainsi Claude ne peut pas dire « terminé » avec des tests rouges sans que tu le voies.
 
-Limite : le hook lit `git status`. Un changement déjà commité pendant le tour échappe au hook. Lance `bin/check` avant de commiter.
+Limite : le hook lit `git status`. Un changement déjà commité pendant le tour échappe au hook. Lance `stackfast check` avant de commiter.
 
 ---
 
-## 10. Déployer derrière un proxy
+## 10. Un conteneur par app, un Caddy devant
 
-### Le conteneur
+### Le conteneur d'une app
 
-Un seul conteneur `php:8.5-apache` sert **toutes** les apps de la stack.
+Chaque app a son conteneur (`main-<slug>`), lancé depuis l'image de sa stack (`sf-main-php-htmx:current`, FrankenPHP).
 
 | Hôte | Conteneur | Mode |
 |---|---|---|
-| `apps/php-htmx/` | `/var/www/html` | lecture-écriture |
-| `stacks/php-htmx/lib/` | `/var/www/stacks/php-htmx/lib` | lecture seule |
+| `apps/php-htmx/<slug>/` | `/app` | lecture-écriture |
+| `stacks/php-htmx/lib/` | `/stacks/php-htmx/lib` | lecture seule |
 
-Les deux viennent de volumes. Modifier une app ou la lib ne demande **pas** de rebuild. L'image ne contient que PHP, Apache, `sqlite3` et le `vendor/` composer.
+Modifier une app ou la lib ne demande **pas** de rebuild. Tout le reste du conteneur est en lecture seule, sans root, sans capability, avec plafonds mémoire / CPU / processus (`stacks/php-htmx/app.compose.yml`). L'app ne voit que son dossier, son `.env` et son réseau.
 
-Au démarrage, `entrypoint.sh` donne à l'utilisateur `www-data` ton `HOST_UID`/`HOST_GID`. Apache écrit donc `data/` avec tes droits.
+Un conteneur en plus (base, worker) : un service dans le `compose.yml` de l'app, seulement si l'architecture l'impose.
 
-Le conteneur n'a **aucun port publié**. Il rejoint seulement le réseau Docker du proxy (`PROXY_NETWORK`).
+### Le proxy
+
+Un seul Caddy par instance (`proxy/compose.yml`), le seul à publier des ports. `bin/proxy` régénère `proxy/generated.caddy` depuis les apps et `proxy/domains`, le valide, le recharge sans coupure, et relie le proxy au réseau de chaque app. `new`, `up` et `domain` l'appellent.
 
 ### Déployer
 
 ```sh
-docker network create caddy-net   # une fois par machine
-bin/deploy php-htmx
+stackfast deploy
 ```
 
-`bin/deploy` fait `git pull --ff-only` (si l'instance a un remote), puis `docker compose up -d --build`.
+`git pull --ff-only` (si l'instance a un remote), puis chaque app à jour, image reconstruite si la stack a changé, proxy régénéré.
 
-### Le proxy
+### Sécurité
 
-Deux modes, modèles dans `proxy/` :
-
-- **Sous-répertoire** : `web.example.com/mon-app/`. Rien à faire de plus.
-- **Domaine dédié** : colle le bloc affiché par `bin/new-app`. Il envoie `X-Base-Path: /`.
+Faille PHP annoncée : `stackfast update`, puis `stackfast audit`. Voir `docs/SECURITE.md`.
 
 ---
 
@@ -531,7 +529,7 @@ Le CLAUDE global définit trois niveaux :
 
 Quand changer :
 
-- **Monter** : le même `bin/check` reste rouge après 2 corrections, le hook bloque 2 fois de suite, ou une hypothèse est renversée.
+- **Monter** : le même `stackfast check` reste rouge après 2 corrections, le hook bloque 2 fois de suite, ou une hypothèse est renversée.
 - **Descendre** : la tâche devient mécanique et une commande vérifie le résultat.
 
 Aucun outil ne change de modèle tout seul.
@@ -548,15 +546,15 @@ Format Codex 0.154 : un fichier `<profil>.config.toml` par profil. Une table `[p
 
 | Symptôme | Cause probable | Action |
 |---|---|---|
-| `/api` répond 401 avec le bon token | token absent du conteneur | `grep <SLUG>_API_TOKEN .env`, puis `bin/deploy php-htmx` |
-| `curl` répond `000` juste après le deploy | Apache démarre | attends 2 s, relance |
+| `/api` répond 401 avec le bon token | token absent du conteneur | `grep <SLUG>_API_TOKEN apps/<stack>/<slug>/.env`, puis `stackfast up <slug>` |
+| l'app ne démarre pas sainement | erreur PHP au démarrage | `stackfast logs <slug>` |
 | `stackfast sync` s'arrête | modif à la main dans `stacks/` | section 12 : reporter ou `--force` |
 | `stackfast push` s'arrête en plein rebase | même ligne modifiée ailleurs | résoudre dans `~/.stackfast`, `git rebase --continue`, `git push` |
-| `bin/check` : lint FAIL sur un VPS | pas de php local et conteneur arrêté | `bin/deploy php-htmx`, puis relance |
-| fichiers de `data/` appartenant à root | `HOST_UID`/`HOST_GID` faux | corrige `.env` (`id -u`, `id -g`), redéploie |
+| `stackfast check` : image absente | stack jamais construite | `stackfast update <stack>` |
+| fichiers de `data/` appartenant à root | `HOST_UID`/`HOST_GID` faux | corrige `.env` (`id -u`, `id -g`), `stackfast up --all` |
 | `Cannot redeclare function` | un fichier chargé deux fois (autoload + require) | voir la Lesson du 2026-09-16 dans la stack |
-| page sans style ni préfixe correct | `X-Base-Path` mal posé par le proxy | compare avec `proxy/caddy/` ou `proxy/nginx/` |
-| un autre conteneur `php-htmx` disparaît au deploy | deux instances sur la même machine partagent le nom de projet compose `php-htmx` | corrigé : le nom du projet compose suit `PHP_HTMX_CONTAINER`. Donne une valeur distincte par instance. Instance déjà déployée sous un autre nom : une fois, `docker compose -p php-htmx --env-file .env -f stacks/php-htmx/docker-compose.yml down`, puis `bin/deploy php-htmx` |
+| page sans style ni préfixe correct | `X-Base-Path` mal posé | `stackfast proxy`, puis regarde `proxy/generated.caddy` |
+| `stackfast audit` : ANCIENNE IMAGE | conteneur pas recréé après un update | `stackfast up <slug>` |
 | `~/.claude/CLAUDE.md` n'est plus un lien | un outil l'a réécrit | `stackfast link` (l'ancien est sauvegardé en `.bak.*`) |
 
 ---
@@ -574,9 +572,11 @@ stackfast skill add ~/.claude/skills/x     # une skill passe dans le hub
 stackfast pull                             # hub à jour
 stackfast init /var/www/mon-vps            # nouvelle instance
 cd /var/www/mon-vps && stackfast sync      # stacks à jour
-bin/new-app php-htmx mon-app               # nouvelle app + token
-bin/check php-htmx mon-app                 # preuve
-bin/deploy php-htmx                        # mise en ligne
+stackfast new php-htmx mon-app             # nouvelle app en ligne
+stackfast check mon-app                    # preuve
+stackfast domain mon-app mon-app.fr        # son adresse
+stackfast deploy                           # après un push
+stackfast update && stackfast audit        # faille PHP annoncée
 
 # Claude Code, dans l'instance
 /new-app php-htmx mon-app
@@ -587,5 +587,5 @@ bin/deploy php-htmx                        # mise en ligne
 Les trois réflexes :
 
 1. **Le métier dans `lib/`**, pur. Tout le reste est un adaptateur.
-2. **Pas de « terminé » sans `CHECK OK`** cité.
+2. **Pas de « terminé » sans `stackfast check` vert** cité.
 3. **Chaque correction devient une ligne**, au plus bas niveau où elle est vraie.

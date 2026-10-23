@@ -1,0 +1,36 @@
+#!/usr/bin/env sh
+# Crée une app et la met en ligne : bin/new <stack> <slug>
+# Copie stacks/<stack>/app-template, crée son .env, lance stacks/<stack>/post-new-app, démarre le conteneur,
+# l'ajoute au proxy et affiche son adresse.
+. "$(dirname "$0")/lib.sh"
+
+STACK="${1:?usage: stackfast new <stack> <slug>}"
+SLUG="${2:?usage: stackfast new <stack> <slug>}"
+TEMPLATE="stacks/$STACK/app-template"
+DEST="apps/$STACK/$SLUG"
+
+case "$SLUG" in
+  *[!a-z0-9-]*|-*|"") die "slug invalide : [a-z0-9-], commence par une lettre ou un chiffre" ;;
+esac
+[ -d "$TEMPLATE" ] || die "stack inconnue : $STACK (stacks disponibles : $(ls stacks | tr '\n' ' '))"
+for d in apps/*/"$SLUG"; do
+  [ -e "$d" ] && die "slug déjà pris : $d"
+done
+
+mkdir -p "apps/$STACK"
+cp -R "$TEMPLATE" "$DEST"
+find "$DEST" -type f -exec sed -i "s/__SLUG__/$SLUG/g" {} +
+: > "$DEST/.env"
+chmod 600 "$DEST/.env"
+say créée "$DEST"
+[ -x "stacks/$STACK/post-new-app" ] && "stacks/$STACK/post-new-app" "$SLUG" "$DEST"
+
+"$ROOT/bin/up" "$SLUG"
+
+cat <<EOF
+
+Ensuite :
+  - remplir $DEST/PRD.md (ou /new-app dans Claude Code) ;
+  - stackfast check $SLUG
+  - quand l'app est mûre : stackfast domain $SLUG $SLUG.<ton-domaine>
+EOF

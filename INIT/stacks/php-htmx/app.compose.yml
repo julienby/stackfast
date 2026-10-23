@@ -1,0 +1,33 @@
+# Base commune du conteneur d'une app php-htmx : image, sécurité, limites, santé, logs.
+# Chaque app l'étend dans son compose.yml (extends). Appartient au hub : une règle changée ici
+# s'applique à toutes les apps au prochain `stackfast up` / `stackfast update`.
+# Les chemins relatifs sont relatifs à CE fichier (stacks/php-htmx/).
+services:
+  web:
+    image: sf-${STACKFAST_INSTANCE:-main}-php-htmx:current
+    restart: unless-stopped
+    # uid de l'hôte : data/ reste lisible et éditable des deux côtés, jamais de root dans le conteneur.
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+      - /data:mode=1777
+      - /config:mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 1.0
+    pids_limit: 128
+    volumes:
+      - ./lib:/stacks/php-htmx/lib:ro
+    healthcheck:
+      test: ["CMD", "php", "/usr/local/share/stackfast/healthcheck.php"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

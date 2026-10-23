@@ -7,21 +7,27 @@ Ma façon de coder avec une IA, et les stacks qui vont avec. Ce repo est le **hu
 | Niveau | Où | Contient | Qui l'écrit |
 |---|---|---|---|
 | **Méthode** | `~/.claude/CLAUDE.md` (Codex : `~/.codex/AGENTS.md`) | comment je travaille, Lessons globales | le hub (`INIT/CLAUDE.global.md`) |
-| **Instance** | un repo par VPS | `AGENTS.md`, `bin/`, `proxy/`, `.env`, `apps/` | gabarit du hub, puis le VPS |
-| **Stack** | `stacks/<stack>/` dans l'instance | conteneur, helpers partagés, `AGENTS.md` de la stack, `app-template/` | **le hub uniquement**, resynchronisé par `stackfast sync` |
-| **App** | `apps/<stack>/<slug>/` | `PRD.md`, `AGENTS.md`, `index.php`, `lib/`, `views/`, `data/`, `tests/` | l'app |
+| **Instance** | un repo par VPS | `AGENTS.md`, `bin/`, `proxy/` (Caddy), `.env`, `apps/` | gabarit du hub, puis le VPS |
+| **Stack** | `stacks/<stack>/` dans l'instance | image, base du conteneur, helpers partagés, `AGENTS.md` de la stack, `app-template/` | **le hub uniquement**, resynchronisé par `stackfast sync` |
+| **App** | `apps/<stack>/<slug>/` | `PRD.md`, `AGENTS.md`, `compose.yml`, `.env`, `index.php`, `lib/`, `views/`, `data/`, `tests/` | l'app |
 
-Une app tourne sur `https://web.example.com/<slug>/` derrière le proxy (Caddy ou nginx). Lui donner un domaine = un bloc proxy, zéro changement de code.
+**Un conteneur par app**, tous construits sur l'image de leur stack, un seul Caddy devant. Une app naît sur `https://apps.domaine.fr/<slug>/`, puis passe à `<slug>.domaine.fr`, puis à son propre domaine : une commande à chaque fois, zéro changement de code, les anciennes adresses redirigent.
 
-## Cinq commandes
+## Parler à l'instance
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/julienby/stackfast/main/INIT/install.sh | sh -s -- mon-vps
-cd mon-vps && cp .env.example .env
-bin/new-app php-htmx demo      # crée apps/php-htmx/demo depuis le gabarit, écrit le token dans .env, imprime le bloc proxy
-bin/check php-htmx demo        # lint + tests CLI ; un hook le relance à chaque fin de tour de Claude
-bin/deploy php-htmx            # git pull + docker compose up -d --build
+cd mon-vps && cp .env.example .env              # APPS_HOST, HOST_UID
+stackfast new php-htmx demo                     # gabarit + token + conteneur + proxy → https://apps.domaine.fr/demo/
+stackfast check demo                            # lint + tests dans l'image ; un hook le relance à chaque fin de tour de Claude
+stackfast domain demo demo.domaine.fr           # l'app est mûre : nouvelle adresse, l'ancienne redirige
+stackfast ls                                    # apps, santé, adresses
+stackfast audit                                 # PHP servi vs dernier correctif, apps à jour
+stackfast update                                # faille PHP publiée : reconstruit, teste toutes les apps, bascule
+stackfast deploy                                # sur le VPS après un push : git pull + tout à jour
 ```
+
+Aussi : `up`, `down`, `logs`, `shell`, `rollback`, `proxy`, `migrate`. `stackfast` sans argument les liste.
 
 Dans Claude Code : `/new-app`, `/feature`, `/retro`.
 
@@ -53,7 +59,7 @@ Modifier `~/.claude/CLAUDE.md`, c'est modifier le clone : `stackfast push` le re
 
 ## Stacks
 
-- `php-htmx` : PHP 8.5 Apache, htmx 4 + Tailwind CDN, JSON à plat puis SQLite, tests CLI. Chaque app expose aussi `/api` et `/mcp` par défaut (bearer token `<SLUG>_API_TOKEN`). Voir `INIT/stacks/php-htmx/AGENTS.md`.
+- `php-htmx` : PHP 8.5 sur FrankenPHP (un conteneur durci par app), htmx 4 + Tailwind CDN, JSON à plat puis SQLite, tests CLI. Chaque app expose aussi `/api` et `/mcp` par défaut (bearer token `<SLUG>_API_TOKEN`). Voir `INIT/stacks/php-htmx/AGENTS.md`.
 - `python` : à venir, même moule.
 
 ## Repo
@@ -70,5 +76,6 @@ DECISIONS.md             arbitrages du hub
 docs/PRD.md              le pourquoi de cette organisation
 docs/GETTING-STARTED.md  tester en local, sans VPS ni domaine
 docs/TUTORIEL.md         tout comprendre, de bout en bout
-docs/DEPLOY-VPS.md       déployer en prod (proxy en dehors du repo, config Caddy/nginx en référence)
+docs/DEPLOY-VPS.md       déployer en prod, migrer une instance de l'ancien modèle
+docs/SECURITE.md         une faille PHP est annoncée : update + audit
 ```

@@ -1,0 +1,28 @@
+# Proxy de l'instance : un seul Caddy devant toutes les apps (TLS automatique, domaines, X-Base-Path).
+# Géré par stackfast (bin/proxy le démarre et le relie au réseau de chaque app) : ne pas lancer à la main.
+# Appartient au hub (resynchronisé). Ta config : proxy/Caddyfile ; les apps : proxy/generated.caddy (généré).
+name: ${STACKFAST_INSTANCE:-main}-proxy
+
+services:
+  caddy:
+    image: caddy:2
+    container_name: ${STACKFAST_INSTANCE:-main}-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      # Le dossier entier (pas un fichier) : une régénération reste visible sans redémarrer.
+      - ./:/etc/caddy:ro
+      - data:/data
+      - config:/config
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  data:
+  config:

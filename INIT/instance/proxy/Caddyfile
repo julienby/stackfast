@@ -1,0 +1,11 @@
+# Caddyfile de l'instance. Les apps sont dans generated.caddy (stackfast domain / stackfast new) :
+# rien à écrire ici pour une app. Ce fichier t'appartient (jamais écrasé par stackfast sync).
+
+# Options globales (doivent rester en tête).
+{
+	# email toi@domaine.fr   # contact Let's Encrypt (facultatif, conseillé)
+}
+
+import generated.caddy
+
+# Tes blocs à la main (site statique, autre service…) en dessous.

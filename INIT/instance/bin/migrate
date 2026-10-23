@@ -1,0 +1,33 @@
+#!/usr/bin/env sh
+# Passe une app de l'ancien modèle (un conteneur Apache partagé par toutes les apps de la stack)
+# au modèle un conteneur par app : compose.yml depuis le gabarit, .env propre à l'app.
+#   bin/migrate <stack> <slug>
+# Les variables <SLUG>_* du .env de l'instance sont COPIÉES dans le .env de l'app (à retirer de l'instance
+# à la main une fois toutes les apps migrées). Le code de l'app n'est pas touché.
+. "$(dirname "$0")/lib.sh"
+
+STACK="${1:?usage: stackfast migrate <stack> <slug>}"
+SLUG="${2:?usage: stackfast migrate <stack> <slug>}"
+DEST="apps/$STACK/$SLUG"
+[ -d "$DEST" ] || die "absente : $DEST"
+[ -f "$DEST/compose.yml" ] && die "déjà migrée : $DEST/compose.yml existe"
+[ -f "stacks/$STACK/app-template/compose.yml" ] || die "stack $STACK sans gabarit compose.yml : stackfast sync d'abord"
+
+sed "s/__SLUG__/$SLUG/g" "stacks/$STACK/app-template/compose.yml" > "$DEST/compose.yml"
+prefix="$(echo "$SLUG" | tr 'a-z-' 'A-Z_')_"
+touch "$DEST/.env"
+chmod 600 "$DEST/.env"
+grep "^$prefix" .env >> "$DEST/.env" || true
+say migrée "$DEST ($(grep -c "^$prefix" .env || true) variable(s) $prefix* copiée(s) dans son .env)"
+if [ -f "$DEST/.htaccess" ]; then
+  echo "Note : $DEST/.htaccess n'est plus lu (FrankenPHP). Les règles du gabarit sont dans stacks/$STACK/Caddyfile ;"
+  echo "       une règle propre à l'app se traduit en Caddyfile (demande à Claude), puis supprime le .htaccess."
+fi
+
+"$ROOT/bin/up" "$SLUG"
+cat <<EOF
+
+Quand toutes les apps sont migrées :
+  - arrête l'ancien conteneur partagé : docker rm -f ${PHP_HTMX_CONTAINER:-php-htmx}
+  - retire du .env de l'instance les variables <SLUG>_* (elles sont dans le .env de chaque app).
+EOF

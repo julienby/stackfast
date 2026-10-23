@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+# Arrête une app (ses conteneurs et son réseau). Fichiers et data/ restent : bin/up la relance.
+#   bin/down <slug>
+. "$(dirname "$0")/lib.sh"
+
+SLUG="${1:?usage: stackfast down <slug>}"
+docker network disconnect "$INSTANCE-$SLUG" "$PROXY" 2>/dev/null || true
+compose_app "$SLUG" down
+say arrêtée "$SLUG (stackfast up $SLUG pour la relancer)"
