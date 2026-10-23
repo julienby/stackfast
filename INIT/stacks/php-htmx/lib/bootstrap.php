@@ -91,6 +91,11 @@ function session_start_app(string $slug): void
     if (session_status() === PHP_SESSION_ACTIVE) {
         return;
     }
+    // Dans data/ de l'app : /tmp du conteneur est effacé à chaque redémarrage (et à chaque mise à jour de la stack).
+    $dir = APP . '/data/.sessions';
+    if (is_dir($dir) || @mkdir($dir, 0700, true)) {
+        session_save_path($dir);
+    }
     session_name(strtoupper(preg_replace('/[^a-z0-9]/i', '', $slug)) . 'SESSID');
     session_set_cookie_params([
         'path' => base_path() . '/',
@@ -119,5 +124,8 @@ function csrf_check(): void
 function env(string $key, ?string $default = null): ?string
 {
     $v = getenv($key);
-    return $v === false ? $default : $v;
+    if ($v === false) {
+        $v = $_SERVER[$key] ?? $_ENV[$key] ?? null;
+    }
+    return is_string($v) ? $v : $default;
 }

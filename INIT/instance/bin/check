@@ -1,22 +1,29 @@
 #!/usr/bin/env sh
-# Vérifie une stack ou une app en appelant stacks/<stack>/check. Exit ≠ 0 si un test échoue.
-#   bin/check                  toutes les stacks
-#   bin/check php-htmx         une stack
-#   bin/check php-htmx demo    une app
-set -eu
-cd "$(dirname "$0")/.."
-STACK="${1:-}"
-SLUG="${2:-}"
+# Vérifie une app, toutes les apps d'une stack, ou tout : lint + tests, dans l'image de la stack.
+#   bin/check            toutes les apps
+#   bin/check <slug>     une app
+#   bin/check <stack>    toutes les apps de la stack
+# Chaque stack fournit stacks/<stack>/check <dossier de l'app> ; IMAGE peut imposer l'image (bin/update).
+. "$(dirname "$0")/lib.sh"
+
+# Ancienne forme « bin/check <stack> <slug> » acceptée.
+[ $# -ge 2 ] && shift
+if [ $# -eq 0 ]; then
+  targets="$(apps)"
+elif [ -d "stacks/$1" ] && ! ls -d apps/*/"$1" >/dev/null 2>&1; then
+  targets="$(apps "$1")"
+else
+  targets="$(app_stack "$1") $1"
+fi
+[ -n "$targets" ] || { echo "rien à vérifier"; exit 0; }
+
 status=0
-
-for s in $(ls stacks); do
-  [ -n "$STACK" ] && [ "$s" != "$STACK" ] && continue
-  if [ -x "stacks/$s/check" ]; then
-    "stacks/$s/check" $SLUG || status=1
-  else
-    echo "stack sans vérification : $s"
-  fi
-done
-
-[ "$status" -eq 0 ] && echo "CHECK OK" || echo "CHECK FAILED"
-exit "$status"
+echo "$targets" | {
+  while read -r stack slug; do
+    echo "### $slug ($stack)"
+    img="${IMAGE:-$(image "$stack"):current}"
+    docker image inspect "$img" >/dev/null 2>&1 || { echo "image $img absente : stackfast update $stack"; status=1; continue; }
+    IMAGE="$img" "stacks/$stack/check" "apps/$stack/$slug" || status=1
+  done
+  exit "$status"
+}

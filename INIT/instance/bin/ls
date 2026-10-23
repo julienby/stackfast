@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+# Liste les apps : stack, état du conteneur, adresse publique.
+. "$(dirname "$0")/lib.sh"
+
+[ -n "$(apps)" ] || { echo "aucune app (stackfast new <stack> <slug>)"; exit 0; }
+printf '%-20s %-10s %-20s %s\n' APP STACK ÉTAT ADRESSE
+apps | while read -r stack slug; do
+  state="$(docker inspect -f '{{.State.Status}}{{if .State.Health}} {{.State.Health.Status}}{{end}}' \
+    "$(app_container "$slug")" 2>/dev/null || echo arrêtée)"
+  printf '%-20s %-10s %-20s %s\n' "$slug" "$stack" "$state" "$(app_url "$slug")"
+done

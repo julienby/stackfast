@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+# Shell dans le conteneur d'une app (même uid, mêmes droits que l'app) : bin/shell <slug> [commande…]
+. "$(dirname "$0")/lib.sh"
+
+SLUG="${1:?usage: stackfast shell <slug> [commande]}"; shift
+[ $# -gt 0 ] || set -- sh
+compose_app "$SLUG" exec web "$@"

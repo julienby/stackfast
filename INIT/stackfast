@@ -10,15 +10,30 @@ usage() {
   cat <<EOF
 stackfast <commande>
 
+Dans une instance (n'importe quel sous-dossier) — les apps :
+  new <stack> <slug>      crée l'app et la met en ligne sur https://\$APPS_HOST/<slug>/
+  ls                      apps, état, adresse
+  domain <slug> [<dom>]   donne une adresse (app1.domaine.fr, puis domaine1.fr…) ; les anciennes redirigent
+  domain <slug> --rm <d>  retire un domaine
+  check [<slug>|<stack>]  lint + tests dans l'image de la stack
+  up <slug>… | --all      démarre / applique la config ; down <slug> arrête
+  logs <slug> [-f]        logs (erreurs PHP comprises) ; shell <slug> : shell dans le conteneur
+  audit                   sécurité : version PHP servie vs dernier correctif, apps sur une ancienne image
+  update [<stack>|proxy]  reconstruit avec le dernier correctif, teste toutes les apps, bascule
+  rollback <stack>        revient à l'image précédente
+  deploy                  git pull + up --all (sur le VPS)
+  proxy                   régénère et recharge Caddy
+  migrate <stack> <slug>  passe une app de l'ancien conteneur partagé à son propre conteneur
+
+Le hub :
   status              changements locaux + écart avec GitHub
   pull                récupère le hub, refait les liens
   push "message"      commit + pull --rebase + push des changements locaux du hub
   link                (re)crée les liens : CLAUDE global, skills
   skill add <dossier> déplace une skill dans le hub et la relie
   init <dossier>      crée une instance (sans écraser) + ses stacks
-  sync [--force] [dossier]  remet bin/, .claude/ et stacks/ d'une instance au niveau du hub (défaut : .)
-                      stop si l'un d'eux a été modifié localement, sauf --force
-  new-app <stack> <slug>  dans une instance : lance bin/new-app
+  sync [--force] [dossier]  remet bin/, .claude/, proxy/compose.yml et stacks/ d'une instance au niveau du hub
+                      (défaut : .) ; stop si l'un d'eux a été modifié localement, sauf --force
 
 Hub : $HUB
 EOF
@@ -104,7 +119,7 @@ cmd_init() {
     echo "git init   : $dest"
   fi
   echo
-  echo "Prêt. Ensuite : cd $dest ; cp .env.example .env ; bin/new-app php-htmx <slug>."
+  echo "Prêt. Ensuite : cd $dest ; cp .env.example .env (APPS_HOST, HOST_UID) ; stackfast new php-htmx <slug>."
 }
 
 # Manifeste écrit à chaque sync : ce que le hub a posé. Sert à repérer les modifs locales.
@@ -115,12 +130,16 @@ sums() {
   ( cd "$1" && find . -type f ! -path './vendor/*' ! -name "$SUMS" -exec sha256sum {} + | sort -k2 )
 }
 
-# bin/ et .claude/ de l'instance : les fichiers du hub, posés un par un (settings.local.json reste).
+# bin/, .claude/ et proxy/compose.yml de l'instance : les fichiers du hub, posés un par un (settings.local.json reste).
 # Stop si un fichier posé a été modifié ou supprimé depuis la dernière sync, sauf --force.
 # Sans manifeste (instance d'avant) : stop si un fichier présent diffère du hub.
+# proxy/Caddyfile et proxy/domains appartiennent à l'instance : posés s'ils manquent, jamais écrasés.
 sync_owned() {
   force="$1"; dest="$2"
-  owned="$( cd "$SRC/instance" && find bin .claude -type f | sort )"
+  for f in proxy/Caddyfile proxy/domains; do
+    [ -e "$dest/$f" ] || { mkdir -p "$dest/proxy"; cp "$SRC/instance/$f" "$dest/$f"; echo "créé       : $f"; }
+  done
+  owned="$( cd "$SRC/instance" && { find bin .claude -type f; echo proxy/compose.yml; } | sort )"
   if [ "$force" -eq 0 ]; then
     if [ -f "$dest/$SUMS" ]; then
       changed="$( cd "$dest" && sha256sum -c --quiet "$SUMS" 2>/dev/null | cut -d: -f1 )"
@@ -145,7 +164,7 @@ sync_owned() {
     cp "$SRC/instance/$f" "$dest/$f"
   done
   ( cd "$SRC/instance" && echo "$owned" | xargs sha256sum ) > "$dest/$SUMS"
-  echo "instance   : bin/ .claude/ (synchronisés)"
+  echo "instance   : bin/ .claude/ proxy/compose.yml (synchronisés)"
 }
 
 # Stacks : remplacées par celles du hub (elles lui appartiennent), apps/ jamais touché.
@@ -174,9 +193,14 @@ cmd_sync() {
   done
 }
 
-cmd_new_app() {
-  [ -x bin/new-app ] || die "pas dans une instance (bin/new-app absent)"
-  exec bin/new-app "$@"
+# Commande d'instance : remonte jusqu'à la racine de l'instance (bin/lib.sh) et lance bin/<commande>.
+cmd_instance() {
+  name="$1"; shift
+  dir="$PWD"
+  while [ "$dir" != / ] && [ ! -f "$dir/bin/lib.sh" ]; do dir="$(dirname "$dir")"; done
+  [ -f "$dir/bin/lib.sh" ] || die "$name : à lancer dans une instance (aucun bin/lib.sh au-dessus de $PWD)"
+  [ -x "$dir/bin/$name" ] || die "$name : commande absente de l'instance ($dir/bin/$name) — stackfast sync ?"
+  exec "$dir/bin/$name" "$@"
 }
 
 cmd="${1:-}"
@@ -189,6 +213,8 @@ case "$cmd" in
   skill)   [ "${1:-}" = add ] || die "usage : stackfast skill add <dossier>"; shift; cmd_skill_add "$@" ;;
   init)    cmd_init "$@" ;;
   sync)    cmd_sync "$@" ;;
-  new-app) cmd_new_app "$@" ;;
+  new-app) cmd_instance new "$@" ;;
+  new|ls|domain|check|up|down|logs|shell|audit|update|rollback|deploy|proxy|migrate)
+           cmd_instance "$cmd" "$@" ;;
   *)       usage ;;
 esac

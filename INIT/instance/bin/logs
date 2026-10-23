@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+# Logs d'une app (erreurs PHP comprises) : bin/logs <slug> [options docker compose logs, ex. -f]
+. "$(dirname "$0")/lib.sh"
+
+SLUG="${1:?usage: stackfast logs <slug> [-f]}"; shift
+compose_app "$SLUG" logs --tail 100 "$@"

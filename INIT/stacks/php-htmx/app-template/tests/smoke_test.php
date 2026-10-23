@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 define('APP', dirname(__DIR__));
-// dirname(APP, 2) en conteneur (DocumentRoot = apps/php-htmx) ; dirname(APP, 3) en local (repo entier).
+// dirname(APP, 2) = / en conteneur (app montée en /app) ; dirname(APP, 3) en local (repo entier).
 foreach ([dirname(APP, 2), dirname(APP, 3)] as $root) {
     if (is_file($root . '/stacks/php-htmx/lib/bootstrap.php')) {
         require_once $root . '/stacks/php-htmx/lib/bootstrap.php';

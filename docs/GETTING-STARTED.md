@@ -29,7 +29,7 @@ Le hub, c'est ce repo. Le client le clone une fois dans `~/.stackfast`.
 | `stackfast pull` | n'importe où | le clone `~/.stackfast` (`git pull`), puis les liens global + skills |
 | `stackfast push "msg"` | n'importe où | commit de **tout** le clone `~/.stackfast`, `pull --rebase`, puis push |
 | `stackfast init mon-vps` | n'importe où | crée les fichiers absents de l'instance, puis `sync` |
-| `stackfast sync` | dans l'instance | `bin/`, `.claude/` et `stacks/` de l'instance, rien d'autre |
+| `stackfast sync` | dans l'instance | `bin/`, `.claude/`, `proxy/compose.yml` et `stacks/` de l'instance, rien d'autre (puis `stackfast deploy` pour l'appliquer) |
 
 Piège : `pull` ne met **pas** à jour l'instance. Après un `pull`, lance `stackfast sync` dans chaque instance.
 
@@ -82,44 +82,37 @@ Autres cas :
 ## Exemple 5 — Le token d'une app
 
 ```sh
-bin/new-app php-htmx mon-app
+stackfast new php-htmx mon-app
 ```
 
-La commande ajoute le token à la fin de `.env` et l'affiche :
+La commande écrit le token dans le `.env` **de l'app** (`apps/php-htmx/mon-app/.env`, gitignoré, lu par son conteneur seulement) :
 
 ```
-Token /api + /mcp (bearer), ajouté dans .env :
-MON_APP_API_TOKEN=3f9a…
+token      : MON_APP_API_TOKEN (bearer /api + /mcp), dans apps/php-htmx/mon-app/.env
 ```
-
-Si `.env` n'existe pas encore, elle affiche « à ajouter dans .env (absent) » : copie la ligne toi-même.
 
 Règle du nom : slug en majuscules, `-` devient `_`, puis `_API_TOKEN`. `mon-app` → `MON_APP_API_TOKEN`. `demo` → `DEMO_API_TOKEN`.
 
-Sans cette ligne dans `.env`, `/api` et `/mcp` répondent 401 à tout le monde. Après un ajout dans `.env`, relance `bin/deploy php-htmx` : le conteneur lit `.env` au démarrage.
+Sans cette ligne, `/api` et `/mcp` répondent 401 à tout le monde. Après une modif du `.env` de l'app : `stackfast up mon-app`.
 
 ```sh
-curl -H "Authorization: Bearer 3f9a…" https://web.example.com/mon-app/api    # 200
-curl https://web.example.com/mon-app/api                                     # 401
+curl -H "Authorization: Bearer 3f9a…" https://apps.example.com/mon-app/api    # 200
+curl https://apps.example.com/mon-app/api                                     # 401
 ```
 
-## Exemple 6 — `X-Base-Path` : une app, deux adresses
+## Exemple 6 — Une app, trois adresses successives
 
-L'app ne connaît pas son adresse. Elle calcule ses liens avec `url('/items')`.
+L'app ne connaît pas son adresse. Elle calcule ses liens avec `url('/items')`, à partir du header `X-Base-Path` que le proxy pose **toujours** (un client ne peut pas le choisir).
 
-| Accès | Le proxy envoie | `url('/items')` donne |
-|---|---|---|
-| `web.example.com/mon-app/` (sous-répertoire) | rien (le proxy efface le header) | `/mon-app/items` |
-| `mon-app.example.com/` (domaine dédié) | `X-Base-Path: /` | `/items` |
+| Étape | Commande | Adresse | `X-Base-Path` | `url('/items')` |
+|---|---|---|---|---|
+| incubation | `stackfast new php-htmx mon-app` | `apps.example.com/mon-app/` | `/mon-app` | `/mon-app/items` |
+| mûre | `stackfast domain mon-app mon-app.example.com` | `mon-app.example.com/` | `/` | `/items` |
+| autonome | `stackfast domain mon-app mon-app.fr` | `mon-app.fr/` | `/` | `/items` |
 
-Sans header, l'app déduit le préfixe du chemin du script (`/mon-app`). Le proxy efface ou écrase **toujours** ce header : un client ne doit pas pouvoir le choisir.
+À chaque étape, les adresses précédentes redirigent (301) vers la nouvelle. Le conteneur ne change pas, le code non plus. L'état tient dans `proxy/domains` (une ligne : `mon-app mon-app.fr mon-app.example.com`), le Caddyfile est régénéré.
 
-Test en local, sans proxy :
-
-```sh
-curl http://$IP/mon-app/                          # liens en /mon-app/...
-curl -H 'X-Base-Path: /' http://$IP/mon-app/      # liens en /...
-```
+Seule chose à faire hors stackfast : pointer le DNS du domaine vers le serveur. Caddy obtient le certificat tout seul.
 
 ## Exemple 7 — Le hook de fin de tour
 
@@ -129,21 +122,23 @@ Dans une instance, Claude Code lance `.claude/hooks/verify.sh` à la fin de chaq
 |---|---|
 | rien de changé dans `apps/` ni `stacks/` (git) | rien ne tourne |
 | une app modifiée, tests verts | rien à signaler |
-| une app modifiée, tests rouges | Claude est bloqué et voit la sortie de `bin/check` |
+| une app modifiée, tests rouges | Claude est bloqué et voit la sortie de `stackfast check <slug>` |
+| `stacks/` modifié | toutes les apps sont vérifiées |
 | déjà bloqué une fois dans ce tour | Claude peut s'arrêter (pas de boucle infinie) |
 
-Limite : le hook regarde `git status`. Un changement déjà **commité** pendant le tour n'est pas vérifié. Lance `bin/check` avant de commiter.
+Seules les apps touchées sont vérifiées : avec 20 apps, un tour ne relance pas 20 conteneurs. Limite : le hook regarde `git status`. Un changement déjà **commité** pendant le tour n'est pas vérifié. Lance `stackfast check` avant de commiter.
 
 ---
 
 # 2. Tester en local
 
-Teste toute la chaîne (installeur → app → conteneur → checks) sans VPS ni domaine, avec juste Docker.
+Teste toute la chaîne (installeur → app → conteneur → proxy → checks) sans VPS ni domaine, avec juste Docker.
 
 ## Prérequis
 
-- Docker + `docker compose`
-- `git`
+- Docker + `docker compose` (v2.17 ou plus)
+- `git`, `curl`, `openssl`
+- les ports 80 et 443 libres (le proxy de l'instance les prend)
 
 ## 1. Créer une instance de test
 
@@ -153,69 +148,56 @@ cd /tmp/mon-instance
 cp .env.example .env
 ```
 
-Édite `.env` si besoin (`HOST_UID`/`HOST_GID` doivent correspondre à ton utilisateur : `id -u`, `id -g`).
+Dans `.env` : `APPS_HOST=localhost`, et `HOST_UID`/`HOST_GID` à `id -u` / `id -g`.
 
 `STACKFAST_HOME="$PWD"` utilise ce clone comme hub, sans en cloner un autre.
-
-Dans l'instance, `stackfast sync` ne touche jamais `apps/`. Il remplace `bin/`, `.claude/` et `stacks/`, sauf si tu les as modifiés (voir exemple 4).
 
 ## 2. Créer une app
 
 ```sh
-bin/new-app php-htmx demo
+stackfast new php-htmx demo
 ```
 
-Crée `apps/php-htmx/demo` depuis le gabarit et affiche le bloc à coller dans le proxy (Caddy ou nginx) une fois en prod. En local on n'en a pas besoin.
+Premier lancement : construit l'image de la stack (une minute), puis démarre le conteneur `main-demo`, puis le proxy `main-proxy`. Ensuite, une app de plus prend quelques secondes.
 
-## 3. Réseau proxy (une fois)
+## 3. Vérifier que ça répond
 
-Les conteneurs de la stack rejoignent un réseau Docker externe nommé par `PROXY_NETWORK` dans `.env` (défaut `caddy-net`) :
+Caddy sert `localhost` avec un certificat local : `-k` pour curl.
 
 ```sh
-docker network create caddy-net
+curl -k https://localhost/demo/                              # page complète
+curl -k -H 'HX-Request: true' https://localhost/demo/         # fragment htmx seul
+curl -k -o /dev/null -w '%{http_code}\n' https://localhost/demo/lib/items.php          # 404 attendu
+curl -k -o /dev/null -w '%{http_code}\n' -X POST https://localhost/demo/items -d 'label=x'  # 403, pas de CSRF
+stackfast ls                                                  # demo : running healthy
 ```
 
-## 4. Déployer
+## 4. Lancer les tests
 
 ```sh
-bin/deploy php-htmx
+stackfast check          # tout
+stackfast check demo     # une app
 ```
 
-Build l'image et démarre le conteneur `web` (nom donné par `PHP_HTMX_CONTAINER` dans `.env`).
+Vert + exit 0 si tout passe, sinon exit 1. Chaque app est testée dans un conteneur jetable (image de la stack, sans réseau).
 
-## 5. Vérifier que ça répond
-
-Le conteneur n'a pas de port publié (il n'est joignable que via le réseau proxy) — on tape son IP directement. Juste après `bin/deploy`, Apache démarre : un premier `curl` peut répondre `000`. Attends deux secondes et relance.
+## 5. Sécurité
 
 ```sh
-IP=$(docker inspect $(grep PHP_HTMX_CONTAINER .env | cut -d= -f2) \
-  --format '{{(index .NetworkSettings.Networks "caddy-net").IPAddress}}')
-
-curl http://$IP/demo/                              # page complète
-curl -H 'HX-Request: true' http://$IP/demo/         # fragment htmx seul
-curl -o /dev/null -w '%{http_code}\n' http://$IP/demo/lib/items.php       # 403 attendu
-curl -o /dev/null -w '%{http_code}\n' -X POST http://$IP/demo/items -d 'label=x'  # 403, pas de CSRF
+stackfast audit          # version PHP servie vs dernier correctif php.net, réglages, apps à jour
+stackfast update         # reconstruit, teste toutes les apps, bascule
 ```
 
-## 6. Lancer les tests
-
-```sh
-bin/check                  # tout
-bin/check php-htmx         # une stack
-bin/check php-htmx demo    # une app
-```
-
-`CHECK OK` + exit 0 si tout passe, `CHECK FAILED` + exit 1 sinon. C'est ce que le hook `.claude/hooks/verify.sh` relance automatiquement en fin de tour dans Claude Code (exit 2 si rouge, pour que Claude voie l'échec).
-
-## 7. Nettoyer
+## 6. Nettoyer
 
 ```sh
 cd /tmp/mon-instance
-docker compose --env-file .env -f stacks/php-htmx/docker-compose.yml down
-docker network rm caddy-net   # seulement si créé pour ce test
+stackfast down demo
+docker compose --env-file .env -f proxy/compose.yml down -v
+docker image rm $(docker image ls -q 'sf-main-php-htmx')
 rm -rf /tmp/mon-instance
 ```
 
 ## Pour de vrai (un VPS)
 
-Même déroulé, avec un vrai domaine devant : installer Caddy ou nginx sur le VPS, coller le bloc affiché par `bin/new-app`, `PROXY_NETWORK` pointant sur le réseau Docker de ce proxy, et `bin/deploy` lancé depuis un `git pull` (ou en CI). Voir `INIT/instance/proxy/` pour les deux exemples de config, et `docs/PRD.md` pour le pourquoi.
+Même déroulé avec `APPS_HOST=apps.ton-domaine.fr` (DNS vers le VPS). Voir `docs/DEPLOY-VPS.md`.

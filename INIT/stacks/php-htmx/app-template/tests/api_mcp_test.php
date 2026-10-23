@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 define('APP', dirname(__DIR__));
-// dirname(APP, 2) en conteneur (DocumentRoot = apps/php-htmx) ; dirname(APP, 3) en local (repo entier).
+// dirname(APP, 2) = / en conteneur (app montée en /app) ; dirname(APP, 3) en local (repo entier).
 foreach ([dirname(APP, 2), dirname(APP, 3)] as $root) {
     if (is_file($root . '/stacks/php-htmx/lib/bootstrap.php')) {
         require_once $root . '/stacks/php-htmx/lib/bootstrap.php';
@@ -22,7 +22,7 @@ function ok(bool $cond, string $label): void
     if (!$cond) { $failed++; }
 }
 
-// Même nom que celui écrit par bin/new-app (tr 'a-z-' 'A-Z_').
+// Même nom que celui écrit par bin/new (tr 'a-z-' 'A-Z_').
 ok(token_env('mon-app') === 'MON_APP_API_TOKEN', 'token : mon-app → MON_APP_API_TOKEN');
 ok(token_env('demo') === 'DEMO_API_TOKEN', 'token : demo → DEMO_API_TOKEN');
 

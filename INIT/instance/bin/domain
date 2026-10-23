@@ -1,0 +1,38 @@
+#!/usr/bin/env sh
+# Donne une adresse à une app. Le nouveau domaine devient le principal ; les anciens redirigent vers lui.
+#   bin/domain <slug>                   affiche les domaines et l'adresse actuelle
+#   bin/domain <slug> app1.domaine.fr   app1.domaine.fr devient l'adresse (ancien chemin et anciens domaines → 301)
+#   bin/domain <slug> --rm <domaine>    retire un domaine (sans domaine : retour à https://$APPS_HOST/<slug>/)
+# État : proxy/domains, une ligne par app : "<slug> <principal> <ancien>…". Zéro changement de code.
+. "$(dirname "$0")/lib.sh"
+
+SLUG="${1:?usage: stackfast domain <slug> [<domaine> | --rm <domaine>]}"
+app_dir "$SLUG" >/dev/null
+touch proxy/domains
+
+if [ $# -eq 1 ]; then
+  list="$(domains "$SLUG" | tr '\n' ' ')"
+  say domaines "${list:-aucun}"
+  say adresse "$(app_url "$SLUG")"
+  exit 0
+fi
+
+if [ "$2" = --rm ]; then
+  host="${3:?usage: stackfast domain <slug> --rm <domaine>}"
+  rest="$(domains "$SLUG" | grep -vxF "$host" | tr '\n' ' ')"
+else
+  host="$2"
+  echo "$host" | grep -Eq '^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$' || die "domaine invalide : $host"
+  owner="$(awk -v h="$host" '{ for (i = 2; i <= NF; i++) if ($i == h) print $1 }' proxy/domains)"
+  [ -z "$owner" ] || [ "$owner" = "$SLUG" ] || die "$host est déjà utilisé par l'app $owner"
+  rest="$host $(domains "$SLUG" | grep -vxF "$host" | tr '\n' ' ')"
+fi
+
+awk -v s="$SLUG" '$1 != s' proxy/domains > proxy/domains.new
+rest="$(echo $rest)"
+[ -n "$rest" ] && echo "$SLUG $rest" >> proxy/domains.new
+mv proxy/domains.new proxy/domains
+
+"$ROOT/bin/proxy"
+say adresse "$(app_url "$SLUG")"
+[ "${2:-}" = --rm ] || echo "DNS : $host doit pointer (A/AAAA) vers ce serveur ; Caddy obtient le certificat tout seul."
