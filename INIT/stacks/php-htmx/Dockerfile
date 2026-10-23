@@ -18,6 +18,10 @@ RUN install-php-extensions gd exif \
  && apt-get update && apt-get install -y --no-install-recommends sqlite3 \
  && rm -rf /var/lib/apt/lists/*
 
+# L'image amont pose NET_BIND_SERVICE sur le binaire (ports < 1024). Avec cap_drop ALL le noyau refuse alors
+# de le lancer (« exec: frankenphp: Operation not permitted ») ; on écoute sur 8080, on la retire.
+RUN setcap -r /usr/local/bin/frankenphp
+
 COPY php.ini $PHP_INI_DIR/conf.d/zz-stackfast.ini
 COPY Caddyfile /etc/frankenphp/Caddyfile
 COPY healthcheck.php /usr/local/share/stackfast/healthcheck.php
