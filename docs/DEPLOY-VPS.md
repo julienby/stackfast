@@ -69,6 +69,8 @@ Procédure complète : [SECURITE.md](SECURITE.md).
 5. `docker rm -f php-htmx` (l'ancien conteneur partagé), puis retire les `<SLUG>_*` du `.env` de l'instance.
 6. `stackfast audit` doit dire « rien à faire ».
 
-## Points non vérifiés en conditions réelles
+## Ce qui a été testé
 
-Écrit et relu, pas encore lancé sur une vraie machine : la chaîne complète (FrankenPHP non root en lecture seule, `docker compose extends`, rechargement du proxy, réseaux par app) doit être validée au premier déploiement, de préférence avec `docs/GETTING-STARTED.md` partie 2 en local.
+Sur un vrai Docker (WSL2 + Docker Engine 29, 23/10/2026) : création d'app, parcours `apps.<hôte>/<slug>/` → `stackfast domain`, isolation réseau entre apps, conteneur durci, `check`, `audit` (détecte PHP 8.5.11), `update` (corrige, et s'arrête sur un test rouge), `rollback`, redémarrage du proxy.
+
+Pas encore testé : un vrai VPS avec DNS public (obtention du certificat Let's Encrypt, ports 80/443), et `stackfast migrate` sur une instance de l'ancien modèle avec des conteneurs Apache en cours d'exécution.
