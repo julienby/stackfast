@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tutoriel stackfast</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Concept : un manuel d'exploitation. Papier gris-bleu, encre marine, un seul accent bleu-vert ;
+   violet réservé aux agents, vert aux apps, orange/rouge aux alertes. Les schémas portent la page. */
+:root{
+  --bg:#F3F6F8; --surface:#FFFFFF; --surface-2:#E6ECF0; --ink:#14222D; --ink-soft:#4C6070; --line:#C7D2DA;
+  --accent:#0A6C8C; --accent-soft:#D5ECF3; --accent-ink:#FFFFFF;
+  --agent:#6446C2; --agent-soft:#E6E0F8; --agent-ink:#3B2784;
+  --ok:#1D7A4B; --ok-soft:#DAF0E3; --warn:#A85A00; --warn-soft:#FAE8CF; --danger:#B3261E; --danger-soft:#F8DAD7;
+  --code-bg:#0F1C26; --code-fg:#DCE8F0; --code-mute:#8DA6B7;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --sans:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0D1620; --surface:#14212C; --surface-2:#1A2B39; --ink:#E5EEF4; --ink-soft:#9DB2C1; --line:#2B4155;
+  --accent:#55BBD9; --accent-soft:#12384A; --accent-ink:#06222D;
+  --agent:#A98FF2; --agent-soft:#2A2349; --agent-ink:#CBBCFA;
+  --ok:#62CF96; --ok-soft:#143629; --warn:#F2A650; --warn-soft:#3A2B13; --danger:#FF8D84; --danger-soft:#3E1E1C;
+  --code-bg:#0A121A; --code-fg:#DCE8F0; --code-mute:#8DA6B7; color-scheme:dark; } }
+:root[data-theme="dark"]{
+  --bg:#0D1620; --surface:#14212C; --surface-2:#1A2B39; --ink:#E5EEF4; --ink-soft:#9DB2C1; --line:#2B4155;
+  --accent:#55BBD9; --accent-soft:#12384A; --accent-ink:#06222D;
+  --agent:#A98FF2; --agent-soft:#2A2349; --agent-ink:#CBBCFA;
+  --ok:#62CF96; --ok-soft:#143629; --warn:#F2A650; --warn-soft:#3A2B13; --danger:#FF8D84; --danger-soft:#3E1E1C;
+  --code-bg:#0A121A; --code-fg:#DCE8F0; --code-mute:#8DA6B7; color-scheme:dark; }
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:64px}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.65 var(--sans);-webkit-text-size-adjust:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:40;background:var(--bg)}
+.wrap{max-width:900px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+a{color:var(--accent)}
+a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+
+/* navigation */
+.nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:var(--bg);border-bottom:1px solid var(--line)}
+.nav .wrap{display:flex;gap:6px;overflow-x:auto;padding-block:10px;scrollbar-width:none}
+.nav a{flex:none;font:500 13.5px var(--sans);text-decoration:none;color:var(--ink-soft);padding:6px 12px;border-radius:999px;border:1px solid transparent}
+.nav a:hover{color:var(--ink);border-color:var(--line)}
+.nav .brand{font:800 15px var(--display);color:var(--ink);padding-left:0;letter-spacing:.01em}
+
+/* en-tête */
+.hero{padding-block:56px 36px}
+.eyebrow{font:500 12.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin:0 0 14px}
+h1{font:800 clamp(2.1rem,6vw,3.5rem)/1.04 var(--display);letter-spacing:-.02em;margin:0 0 18px;text-wrap:balance}
+.lead{font-size:1.125rem;max-width:62ch;color:var(--ink-soft);margin:0}
+.path{max-width:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:32px 0 0;padding:0;list-style:none}
+.path li{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;min-width:0}
+.path b{display:flex;align-items:center;gap:10px;font:700 1.05rem var(--display);margin-bottom:6px}
+.path .n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font:600 13px var(--sans)}
+.path span.d{font-size:.92rem;color:var(--ink-soft)}
+.path a{text-decoration:none;color:inherit;display:block}
+
+/* sections */
+section{padding-block:44px 8px;border-top:1px solid var(--line)}
+h2{font:700 clamp(1.6rem,4vw,2.2rem)/1.15 var(--display);letter-spacing:-.015em;margin:0 0 6px;text-wrap:balance}
+h2 + .sub{color:var(--ink-soft);margin:0 0 22px;max-width:64ch}
+h3{font:700 1.2rem/1.3 var(--display);margin:34px 0 8px;text-wrap:balance}
+p{margin:.7em 0;max-width:68ch}
+ul,ol{max-width:68ch;padding-left:1.25em}
+li{margin:.3em 0}
+code{font:400 .88em var(--mono);background:var(--surface-2);padding:.12em .38em;border-radius:5px;overflow-wrap:anywhere}
+strong{font-weight:600}
+.meta{font:500 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft)}
+
+/* étapes numérotées (vraie séquence) */
+ol.steps{list-style:none;padding:0;margin:20px 0;counter-reset:s;max-width:none}
+ol.steps > li{position:relative;padding-left:48px;margin:0 0 6px;counter-increment:s}
+ol.steps > li::before{content:counter(s);position:absolute;left:0;top:2px;width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font:600 14px var(--sans)}
+ol.steps > li > h3{margin-top:0}
+ol.steps > li > :last-child{margin-bottom:18px}
+
+/* code */
+.code{position:relative;margin:14px 0}
+.code pre{margin:0;background:var(--code-bg);color:var(--code-fg);border-radius:10px;padding:14px 84px 14px 16px;overflow-x:auto;font:400 13.5px/1.6 var(--mono);max-width:none}
+.code pre code{background:none;padding:0;font:inherit;color:inherit}
+.code .c{color:var(--code-mute)}
+.code .o{color:#8FD1E6}
+.cp{position:absolute;top:8px;right:8px;font:500 12px var(--sans);color:var(--code-fg);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:6px;padding:3px 9px;cursor:pointer}
+.cp:hover{background:rgba(255,255,255,.16)}
+
+/* encadrés */
+.callout{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:12px 16px;margin:20px 0;max-width:none}
+.callout p{margin:.4em 0;max-width:none}
+.callout b.k{display:block;font:700 12px var(--mono);letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px}
+.callout.warn{background:var(--warn-soft);border-color:var(--warn)} .callout.warn b.k{color:var(--warn)}
+.callout.ok{background:var(--ok-soft);border-color:var(--ok)} .callout.ok b.k{color:var(--ok)}
+.callout.info{background:var(--accent-soft);border-color:var(--accent)} .callout.info b.k{color:var(--accent)}
+.callout.agent{background:var(--agent-soft);border-color:var(--agent)} .callout.agent b.k{color:var(--agent)}
+.callout.danger{background:var(--danger-soft);border-color:var(--danger)} .callout.danger b.k{color:var(--danger)}
+
+/* tableaux */
+.tw{overflow-x:auto;margin:16px 0;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.93rem;min-width:520px}
+th{font:600 12px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft);text-align:left;padding:10px 14px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td:first-child{white-space:nowrap}
+td code{white-space:nowrap}
+
+/* schémas */
+.fig{margin:26px 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 12px 12px}
+.figscroll{overflow-x:auto}
+.fig svg{display:block;width:100%;height:auto;color:var(--ink-soft)}
+.fig .hint{display:none;font-size:.82rem;color:var(--ink-soft);margin:8px 6px 0;max-width:none}
+.fig figcaption{font-size:.9rem;color:var(--ink-soft);padding:10px 6px 0;max-width:none}
+.fig figcaption code{font-size:.85em}
+.node{fill:var(--surface);stroke:var(--line);stroke-width:1.4}
+.node-accent{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.4}
+.node-agent{fill:var(--agent-soft);stroke:var(--agent);stroke-width:1.4}
+.node-ok{fill:var(--ok-soft);stroke:var(--ok);stroke-width:1.4}
+.node-warn{fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.4}
+.node-danger{fill:var(--danger-soft);stroke:var(--danger);stroke-width:1.4}
+.zone{fill:none;stroke:var(--line);stroke-width:1.4;stroke-dasharray:6 5}
+.zone-agent{stroke:var(--agent)}
+.band{fill:var(--surface-2)}
+.life{stroke:var(--line);stroke-width:1.2;stroke-dasharray:3 5}
+.edge{fill:none;stroke:var(--ink-soft);stroke-width:1.6}
+.edge-accent{stroke:var(--accent)} .edge-agent{stroke:var(--agent)} .edge-ok{stroke:var(--ok)}
+.edge-danger{stroke:var(--danger)} .edge-warn{stroke:var(--warn)}
+.dash{stroke-dasharray:5 4}
+.mk{fill:var(--ink-soft)} .mk-accent{fill:var(--accent)} .mk-agent{fill:var(--agent)} .mk-ok{fill:var(--ok)}
+.mk-danger{fill:var(--danger)} .mk-warn{fill:var(--warn)}
+.t{fill:var(--ink);font:500 13px var(--sans)}
+.t-b{font-weight:600}
+.t-s{fill:var(--ink-soft);font:400 12px var(--sans)}
+.t-m{fill:var(--ink-soft);font:400 11.5px var(--mono)}
+.t-h{fill:var(--ink);font:700 15px var(--display)}
+.t-phase{fill:var(--ink-soft);font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase}
+.t-tag{fill:var(--ink);font:600 11px var(--sans)}
+.t-ink{fill:var(--ink)}
+.t-danger{fill:var(--danger)}
+.t-agentink{fill:var(--agent-ink)}
+.halo{stroke:var(--surface);stroke-width:4px;paint-order:stroke;stroke-linejoin:round}
+
+footer{border-top:1px solid var(--line);margin-top:56px;padding-block:28px 56px;color:var(--ink-soft);font-size:.92rem}
+footer p{max-width:none}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@media (max-width:780px){.fig .hint{display:block}.code{display:flex;flex-direction:column;background:var(--code-bg);border-radius:10px}.code .cp{position:static;order:-1;align-self:flex-end;margin:8px 8px 0}.code pre{padding:8px 16px 14px;border-radius:0 0 10px 10px}}
+@media (max-width:560px){.hero{padding-block:36px 24px} ol.steps > li{padding-left:42px}}
+</style>
+</head>
+<body>
+
+<nav class="nav" aria-label="Sections">
+  <div class="wrap">
+    <a class="brand" href="#debut">stackfast</a>
+    <a href="#carte">La carte</a>
+    <a href="#install">Installation</a>
+    <a href="#premier">Premier projet</a>
+    <a href="#vie">Vie du projet</a>
+    <a href="#memo">Aide-mémoire</a>
+    <a href="#pannes">Dépannage</a>
+  </div>
+</nav>
+
+<header class="hero wrap" id="debut">
+  <p class="eyebrow">Tutoriel · du premier jour à la production</p>
+  <h1>Du serveur vide au site en ligne</h1>
+  <p class="lead">stackfast fait d'un serveur une usine à sites. Une commande crée une app, la met en ligne en HTTPS, la sauvegarde, la met à jour quand une faille PHP sort, et laisse des agents y travailler sans qu'ils voient le reste. Ce tutoriel suit le chemin complet, avec ce qui se passe sous le capot à chaque étape.</p>
+  <ul class="path">
+    <li><a href="#install"><b><span class="n">1</span>Installer</b><span class="d">Docker, un enregistrement DNS, une commande. Un dossier d'instance par serveur.</span></a></li>
+    <li><a href="#premier"><b><span class="n">2</span>Premier projet</b><span class="d"><code>stackfast new</code>, puis un nom de domaine. Environ une minute la première fois.</span></a></li>
+    <li><a href="#vie"><b><span class="n">3</span>Faire vivre</b><span class="d">Développer, agents, sauvegardes, correctifs de sécurité, mises à jour.</span></a></li>
+  </ul>
+</header>
+
+<main class="wrap">
+
+<section id="carte">
+  <h2>La carte</h2>
+  <p class="sub">Quatre mots suffisent pour tout comprendre. Le reste du tutoriel ne fait que les utiliser.</p>
+
+  <figure class="fig"><div class="figscroll"><div style="min-width:720px"><svg viewBox="0 0 860 402" role="img" aria-label="Les quatre niveaux : le hub fournit la méthode, les stacks et le gabarit ; l&#x27;instance les reçoit et héberge les apps" xmlns="http://www.w3.org/2000/svg"><defs><marker id="f1-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f1-a-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-accent" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f1-a-agent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-agent" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f1-a-danger" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-danger" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f1-a-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-ok" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f1-a-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-warn" d="M0,1 L10,5 L0,9 z"/></marker></defs><rect class="zone" x="20" y="18" width="300" height="352" rx="14"/><text class="t-h" x="38" y="44" text-anchor="start"><tspan x="38" dy="0">Le hub</tspan></text><text class="t-s" x="38" y="61" text-anchor="start"><tspan x="38" dy="0">repo GitHub stackfast, cloné dans ~/.stackfast</tspan></text><rect class="node-accent" x="36" y="86" width="268" height="54" rx="8"/><text class="t t-b" x="50" y="109" text-anchor="start"><tspan x="50" dy="0">Gabarit d&#x27;instance</tspan></text><text class="t-s" x="50" y="126" text-anchor="start"><tspan x="50" dy="0">bin/ · proxy/ · agent/ · .claude/</tspan></text><rect class="node-accent" x="36" y="152" width="268" height="54" rx="8"/><text class="t t-b" x="50" y="175" text-anchor="start"><tspan x="50" dy="0">Stacks</tspan></text><text class="t-s" x="50" y="192" text-anchor="start"><tspan x="50" dy="0">php-htmx : image, Caddyfile, gabarit d&#x27;app</tspan></text><rect class="node" x="36" y="218" width="268" height="54" rx="8"/><text class="t t-b" x="50" y="241" text-anchor="start"><tspan x="50" dy="0">Méthode</tspan></text><text class="t-s" x="50" y="258" text-anchor="start"><tspan x="50" dy="0">CLAUDE.global.md  →  lien ~/.claude/CLAUDE.md</tspan></text><rect class="node" x="36" y="284" width="268" height="54" rx="8"/><text class="t t-b" x="50" y="307" text-anchor="start"><tspan x="50" dy="0">Client</tspan></text><text class="t-s" x="50" y="324" text-anchor="start"><tspan x="50" dy="0">INIT/stackfast  →  lien ~/.local/bin/stackfast</tspan></text><rect class="zone" x="440" y="18" width="400" height="352" rx="14"/><text class="t-h" x="458" y="44" text-anchor="start"><tspan x="458" dy="0">Une instance</tspan></text><text class="t-s" x="458" y="61" text-anchor="start"><tspan x="458" dy="0">un dossier = un serveur, ~/mon-instance (dépôt git)</tspan></text><rect class="node-accent" x="456" y="86" width="368" height="54" rx="8"/><text class="t t-b" x="470" y="109" text-anchor="start"><tspan x="470" dy="0">bin/ · proxy/compose.yml · agent/ · .claude/</tspan></text><text class="t-s" x="470" y="126" text-anchor="start"><tspan x="470" dy="0">posés par le hub, resynchronisés</tspan></text><rect class="node-accent" x="456" y="152" width="368" height="54" rx="8"/><text class="t t-b" x="470" y="175" text-anchor="start"><tspan x="470" dy="0">stacks/php-htmx/</tspan></text><text class="t-s" x="470" y="192" text-anchor="start"><tspan x="470" dy="0">posé par le hub · ne s&#x27;édite pas ici</tspan></text><rect class="node" x="456" y="218" width="368" height="54" rx="8"/><text class="t t-b" x="470" y="241" text-anchor="start"><tspan x="470" dy="0">proxy/Caddyfile · proxy/domains · .env</tspan></text><text class="t-s" x="470" y="258" text-anchor="start"><tspan x="470" dy="0">à toi : jamais écrasés</tspan></text><rect class="node" x="456" y="284" width="368" height="74" rx="8"/><text class="t t-b" x="470" y="304" text-anchor="start"><tspan x="470" dy="0">apps/php-htmx/</tspan></text><rect class="node-ok" x="470" y="314" width="104" height="32" rx="6"/><text class="t-m t-ink" x="522" y="335" text-anchor="middle"><tspan x="522" dy="0">monsite</tspan></text><rect class="node-ok" x="586" y="314" width="104" height="32" rx="6"/><text class="t-m t-ink" x="638" y="335" text-anchor="middle"><tspan x="638" dy="0">demo</tspan></text><rect class="node-ok" x="702" y="314" width="104" height="32" rx="6"/><text class="t-m t-ink" x="754" y="335" text-anchor="middle"><tspan x="754" dy="0">…</tspan></text><text class="t-s" x="604" y="304" text-anchor="start"><tspan x="604" dy="0">chacune : compose.yml, .env, data/</tspan></text><path class="edge edge-accent" d="M304,113 L454,113" marker-end="url(#f1-a-accent)"/><text class="t-s halo" x="379" y="104" text-anchor="middle"><tspan x="379" dy="0">init, puis sync</tspan></text><path class="edge edge-accent" d="M304,179 L454,179" marker-end="url(#f1-a-accent)"/><text class="t-s halo" x="379" y="170" text-anchor="middle"><tspan x="379" dy="0">sync</tspan></text><rect class="node-accent" x="36" y="380" width="12" height="12" rx="3"/><text class="t-s" x="54" y="391" text-anchor="start"><tspan x="54" dy="0">posé et mis à jour par le hub</tspan></text><rect class="node-ok" x="256" y="380" width="12" height="12" rx="3"/><text class="t-s" x="274" y="391" text-anchor="start"><tspan x="274" dy="0">tes apps</tspan></text></svg></div></div><p class="hint">Fais glisser le schéma vers la gauche pour voir la suite.</p><figcaption>Le hub (à gauche) fournit le gabarit et les stacks ; l'instance (à droite) les reçoit par <code>init</code> puis <code>sync</code>, et n'écrit que ses propres fichiers.</figcaption></figure>
+
+  <div class="tw"><table>
+    <thead><tr><th>Mot</th><th>Ce que c'est</th></tr></thead>
+    <tbody>
+      <tr><td><b>Hub</b></td><td>Le repo stackfast sur GitHub : la méthode de travail, les stacks, le gabarit d'instance et la commande <code>stackfast</code>. C'est lui que tu fais évoluer.</td></tr>
+      <tr><td><b>Instance</b></td><td>Un dossier sur un serveur, qui est un dépôt git. Elle reçoit les stacks du hub et héberge tes apps. Un serveur, une instance.</td></tr>
+      <tr><td><b>Stack</b></td><td>Une façon de faire des apps. Aujourd'hui <code>php-htmx</code> : PHP 8.5 sur FrankenPHP, htmx, Tailwind. Elle appartient au hub : l'instance ne la modifie pas.</td></tr>
+      <tr><td><b>App</b></td><td>Un projet, dans <code>apps/&lt;stack&gt;/&lt;slug&gt;/</code>. Son conteneur, son <code>.env</code>, ses <code>data/</code>, son code.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Une fois en route</h3>
+  <p>Voici ce qui tourne sur le serveur quand tout est installé. Un seul point d'entrée, et une cloison étanche entre les apps.</p>
+
+  <figure class="fig"><div class="figscroll"><div style="min-width:760px"><svg viewBox="0 0 860 470" role="img" aria-label="À l&#x27;arrivée : un Caddy reçoit le trafic HTTPS et le répartit vers un conteneur par app, chacune dans son réseau privé ; une sandbox d&#x27;agent a sa propre route protégée" xmlns="http://www.w3.org/2000/svg"><defs><marker id="f2-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f2-a-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-accent" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f2-a-agent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-agent" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f2-a-danger" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-danger" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f2-a-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-ok" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f2-a-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-warn" d="M0,1 L10,5 L0,9 z"/></marker></defs><rect class="node" x="16" y="190" width="118" height="64" rx="10"/><text class="t t-b" x="75" y="218" text-anchor="middle"><tspan x="75" dy="0">Navigateur</tspan></text><text class="t-m" x="75" y="236" text-anchor="middle"><tspan x="75" dy="0">https://…</tspan></text><rect class="node-accent" x="214" y="120" width="190" height="204" rx="12"/><text class="t-h" x="309" y="148" text-anchor="middle"><tspan x="309" dy="0">Caddy</tspan></text><text class="t-m" x="309" y="166" text-anchor="middle"><tspan x="309" dy="0">main-proxy</tspan></text><text class="t-s" x="309" y="194" text-anchor="middle"><tspan x="309" dy="0">ports 80 et 443 seuls</tspan></text><text class="t-s" x="309" y="212" text-anchor="middle"><tspan x="309" dy="0">certificats Let&#x27;s Encrypt</tspan></text><text class="t-s" x="309" y="230" text-anchor="middle"><tspan x="309" dy="0">proxy/generated.caddy</tspan></text><text class="t-s" x="309" y="248" text-anchor="middle"><tspan x="309" dy="0">(une route par app)</tspan></text><text class="t-s" x="309" y="282" text-anchor="middle"><tspan x="309" dy="0">pose X-Base-Path :</tspan></text><text class="t-m" x="309" y="298" text-anchor="middle"><tspan x="309" dy="0">/slug ou /</tspan></text><path class="edge edge-accent" d="M134,222 L212,222" marker-end="url(#f2-a-accent)"/><text class="t-s halo" x="173" y="212" text-anchor="middle"><tspan x="173" dy="0">HTTPS</tspan></text><path class="edge edge-accent" d="M404,222 L462,222"/><path class="edge edge-accent" d="M462,70 L462,340"/><path class="edge edge-accent" d="M462,74 L520,74" marker-end="url(#f2-a-accent)"/><rect class="zone" x="520" y="24" width="320" height="100" rx="12"/><text class="t-s" x="534" y="44" text-anchor="start"><tspan x="534" dy="0">réseau privé de l&#x27;app</tspan></text><rect class="node-ok" x="534" y="52" width="292" height="60" rx="8"/><text class="t t-b" x="548" y="74" text-anchor="start"><tspan x="548" dy="0">main-monsite</tspan></text><text class="t-s" x="548" y="92" text-anchor="start"><tspan x="548" dy="0">FrankenPHP :8080 · uid non-root · lecture seule</tspan></text><text class="t-s" x="548" y="107" text-anchor="start"><tspan x="548" dy="0">bind mounts : son code, data/, .env</tspan></text><path class="edge edge-accent" d="M462,196 L520,196" marker-end="url(#f2-a-accent)"/><rect class="zone" x="520" y="146" width="320" height="100" rx="12"/><text class="t-s" x="534" y="166" text-anchor="start"><tspan x="534" dy="0">réseau privé de l&#x27;app</tspan></text><rect class="node-ok" x="534" y="174" width="292" height="60" rx="8"/><text class="t t-b" x="548" y="196" text-anchor="start"><tspan x="548" dy="0">main-demo</tspan></text><text class="t-s" x="548" y="214" text-anchor="start"><tspan x="548" dy="0">FrankenPHP :8080 · uid non-root · lecture seule</tspan></text><text class="t-s" x="548" y="229" text-anchor="start"><tspan x="548" dy="0">bind mounts : son code, data/, .env</tspan></text><path class="edge edge-accent" d="M462,318 L520,318" marker-end="url(#f2-a-accent)"/><rect class="zone" x="520" y="268" width="320" height="100" rx="12"/><text class="t-s" x="534" y="288" text-anchor="start"><tspan x="534" dy="0">réseau privé de l&#x27;app</tspan></text><rect class="node-ok" x="534" y="296" width="292" height="60" rx="8"/><text class="t t-b" x="548" y="318" text-anchor="start"><tspan x="548" dy="0">main-app3</tspan></text><text class="t-s" x="548" y="336" text-anchor="start"><tspan x="548" dy="0">FrankenPHP :8080 · uid non-root · lecture seule</tspan></text><text class="t-s" x="548" y="351" text-anchor="start"><tspan x="548" dy="0">bind mounts : son code, data/, .env</tspan></text><text class="t-s halo" x="454" y="62" text-anchor="end"><tspan x="454" dy="0">reverse_proxy</tspan></text><text class="t-s t-danger" x="840" y="138" text-anchor="end"><tspan x="840" dy="0">✕  aucun lien entre apps</tspan></text><text class="t-s t-danger" x="840" y="260" text-anchor="end"><tspan x="840" dy="0">✕  aucun lien entre apps</tspan></text><path class="edge edge-agent" d="M462,340 L462,424"/><path class="edge edge-agent" d="M462,424 L520,424" marker-end="url(#f2-a-agent)"/><rect class="node-agent" x="520" y="392" width="320" height="62" rx="10"/><text class="t t-b" x="534" y="414" text-anchor="start"><tspan x="534" dy="0">Sandbox d&#x27;agent (optionnel)</tspan></text><text class="t-s" x="534" y="432" text-anchor="start"><tspan x="534" dy="0">même image + Claude Code · son réseau à lui</tspan></text><text class="t-s" x="534" y="447" text-anchor="start"><tspan x="534" dy="0">route /_preview/… sous mot de passe</tspan></text><text class="t-s halo" x="454" y="418" text-anchor="end"><tspan x="454" dy="0">preview</tspan></text></svg></div></div><p class="hint">Fais glisser le schéma vers la gauche pour voir la suite.</p><figcaption>Un seul point d'entrée (Caddy, ports 80 et 443). Chaque app est un conteneur durci dans son réseau privé, et une app ne peut pas joindre une autre app.</figcaption></figure>
+
+  <ul>
+    <li><b>Un Caddy par instance.</b> Il est le seul à publier des ports (80 et 443). Il obtient et renouvelle les certificats tout seul.</li>
+    <li><b>Un conteneur par app.</b> Même image que sa stack, système de fichiers en lecture seule, utilisateur non root, aucune capability, mémoire et processus plafonnés.</li>
+    <li><b>Un réseau privé par app.</b> Seul Caddy les rejoint toutes. Une app compromise ne voit ni le code, ni les données, ni les secrets des autres.</li>
+    <li><b>Les secrets restent par app.</b> Chaque app lit son propre <code>.env</code> ; l'instance n'a que ses réglages.</li>
+  </ul>
+</section>
+
+<section id="install">
+  <h2>Installation</h2>
+  <p class="sub">Compte une dizaine de minutes, dont l'attente du DNS. Tout se passe sur le serveur.</p>
+
+  <h3>Avant de commencer</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Il te faut</th><th>Détail</th></tr></thead>
+    <tbody>
+      <tr><td>Un serveur Linux</td><td>Ubuntu ou Debian, accès SSH, un compte avec <code>sudo</code>.</td></tr>
+      <tr><td>Docker</td><td>Docker Engine avec <code>docker compose</code> v2.17 ou plus. Étape 1 ci-dessous.</td></tr>
+      <tr><td>git, curl, openssl</td><td>Presque toujours déjà là. <code>sudo apt install git curl openssl</code> sinon.</td></tr>
+      <tr><td>Les ports 80 et 443 libres</td><td>Le Caddy de stackfast les prend. Un autre Caddy ou nginx doit être arrêté avant (voir l'encadré plus bas).</td></tr>
+      <tr><td>Un nom de domaine</td><td>Dont tu peux modifier le DNS.</td></tr>
+    </tbody>
+  </table></div>
+
+  <ol class="steps">
+    <li>
+      <h3>Installer Docker</h3>
+      <div class="code"><pre><code>curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER      <span class="c"># puis déconnecte-toi et reconnecte-toi</span></code></pre></div>
+      <p>Vérifie avec <code>docker version</code> et <code>docker compose version</code>, sans <code>sudo</code>.</p>
+    </li>
+    <li>
+      <h3>Pointer un nom vers le serveur</h3>
+      <p>Chez ton registrar, ajoute un enregistrement pour l'hôte des apps en incubation. Ce nom ne servira qu'à tester ; le vrai domaine du site viendra plus tard, sur le même principe.</p>
+      <div class="tw"><table>
+        <thead><tr><th>Nom</th><th>Type</th><th>Valeur</th></tr></thead>
+        <tbody><tr><td><code>apps.tondomaine.fr</code></td><td>A <span class="meta">(et AAAA si IPv6)</span></td><td>l'adresse IP du serveur</td></tr></tbody>
+      </table></div>
+      <p>Le certificat sera demandé au premier accès, donc le nom doit déjà répondre. Attends la propagation avant l'étape 5.</p>
+    </li>
+    <li>
+      <h3>Installer stackfast et créer l'instance</h3>
+      <div class="code"><pre><code>curl -fsSL https://raw.githubusercontent.com/julienby/stackfast/main/INIT/install.sh | sh -s -- ~/mon-instance</code></pre></div>
+      <p>Le script est idempotent : tu peux le relancer sans risque. Voici ce qu'il fait.</p>
+      <figure class="fig"><div class="figscroll"><div style="min-width:700px"><svg viewBox="0 0 860 526" role="img" aria-label="Séquence d&#x27;installation : le script clone le hub, pose la commande et les liens, puis crée l&#x27;instance" xmlns="http://www.w3.org/2000/svg"><defs><marker id="f3-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f3-a-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-accent" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f3-a-agent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-agent" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f3-a-danger" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-danger" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f3-a-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-ok" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f3-a-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-warn" d="M0,1 L10,5 L0,9 z"/></marker></defs><line class="life" x1="84.0" y1="60" x2="84.0" y2="516"/><line class="life" x1="257.0" y1="60" x2="257.0" y2="516"/><line class="life" x1="430.0" y1="60" x2="430.0" y2="516"/><line class="life" x1="603.0" y1="60" x2="603.0" y2="516"/><line class="life" x1="776.0" y1="60" x2="776.0" y2="516"/><rect class="band" x="8" y="287.0" width="844" height="24" rx="6"/><text class="t-phase" x="18" y="304.0" text-anchor="start"><tspan x="18" dy="0">stackfast init ~/mon-instance</tspan></text><rect class="band" x="8" y="441.0" width="844" height="24" rx="6"/><text class="t-phase" x="18" y="458.0" text-anchor="start"><tspan x="18" dy="0">à la main</tspan></text><rect class="node" x="15.0" y="14" width="138" height="46" rx="8"/><text class="t t-b" x="84.0" y="34" text-anchor="middle"><tspan x="84.0" dy="0">Toi</tspan></text><text class="t-m" x="84.0" y="50" text-anchor="middle"><tspan x="84.0" dy="0">terminal du VPS</tspan></text><rect class="node" x="188.0" y="14" width="138" height="46" rx="8"/><text class="t t-b" x="257.0" y="34" text-anchor="middle"><tspan x="257.0" dy="0">install.sh</tspan></text><text class="t-m" x="257.0" y="50" text-anchor="middle"><tspan x="257.0" dy="0">curl | sh</tspan></text><rect class="node" x="361.0" y="14" width="138" height="46" rx="8"/><text class="t t-b" x="430.0" y="34" text-anchor="middle"><tspan x="430.0" dy="0">GitHub</tspan></text><text class="t-m" x="430.0" y="50" text-anchor="middle"><tspan x="430.0" dy="0">julienby/stackfast</tspan></text><rect class="node" x="534.0" y="14" width="138" height="46" rx="8"/><text class="t t-b" x="603.0" y="34" text-anchor="middle"><tspan x="603.0" dy="0">Ton dossier perso</tspan></text><text class="t-m" x="603.0" y="50" text-anchor="middle"><tspan x="603.0" dy="0">~</tspan></text><rect class="node" x="707.0" y="14" width="138" height="46" rx="8"/><text class="t t-b" x="776.0" y="34" text-anchor="middle"><tspan x="776.0" dy="0">Instance</tspan></text><text class="t-m" x="776.0" y="50" text-anchor="middle"><tspan x="776.0" dy="0">~/mon-instance</tspan></text><path class="edge" d="M87.0,120 L253.0,120" marker-end="url(#f3-a)"/><text class="t-s halo" x="170.5" y="112" text-anchor="middle"><tspan x="170.5" dy="0">curl … | sh -s -- ~/mon-instance</tspan></text><path class="edge" d="M260.0,160 L426.0,160" marker-end="url(#f3-a)"/><text class="t-s halo" x="343.5" y="152" text-anchor="middle"><tspan x="343.5" dy="0">git clone (ou pull)</tspan></text><path class="edge dash" d="M433.0,200 L599.0,200" marker-end="url(#f3-a)"/><text class="t-s halo" x="516.5" y="192" text-anchor="middle"><tspan x="516.5" dy="0">le hub arrive dans ~/.stackfast</tspan></text><path class="edge" d="M260.0,240 L599.0,240" marker-end="url(#f3-a)"/><text class="t-s halo" x="430.0" y="232" text-anchor="middle"><tspan x="430.0" dy="0">lien ~/.local/bin/stackfast</tspan></text><path class="edge" d="M260.0,280 L599.0,280" marker-end="url(#f3-a)"/><text class="t-s halo" x="430.0" y="272" text-anchor="middle"><tspan x="430.0" dy="0">liens ~/.claude/CLAUDE.md et skills</tspan></text><path class="edge edge-accent" d="M260.0,354 L772.0,354" marker-end="url(#f3-a-accent)"/><text class="t-s halo" x="516.5" y="346" text-anchor="middle"><tspan x="516.5" dy="0">copie le gabarit, sans rien écraser</tspan></text><path class="edge edge-accent" d="M260.0,394 L772.0,394" marker-end="url(#f3-a-accent)"/><text class="t-s halo" x="516.5" y="386" text-anchor="middle"><tspan x="516.5" dy="0">sync : stacks/, bin/, empreintes sha256</tspan></text><path class="edge" d="M260.0,434 L772.0,434" marker-end="url(#f3-a)"/><text class="t-s halo" x="516.5" y="426" text-anchor="middle"><tspan x="516.5" dy="0">git init</tspan></text><path class="edge" d="M87.0,508 L772.0,508" marker-end="url(#f3-a)"/><text class="t-s halo" x="430.0" y="500" text-anchor="middle"><tspan x="430.0" dy="0">cp .env.example .env, puis édite</tspan></text></svg></div></div><p class="hint">Fais glisser le schéma vers la gauche pour voir la suite.</p><figcaption>L'installation tient en une commande ; l'instance est créée sans écraser ce qui existe, puis remplie par <code>sync</code>.</figcaption></figure>
+      <p>Il laisse ceci sur le disque :</p>
+      <div class="code"><pre><code>~/.stackfast/             <span class="c"># le hub (clone git, c'est lui qu'on met à jour)</span>
+~/.local/bin/stackfast    <span class="c"># la commande (ajoute ~/.local/bin à ton PATH si besoin)</span>
+~/.claude/CLAUDE.md       <span class="c"># la méthode, en lien vers le hub</span>
+~/mon-instance/
+  AGENTS.md  DECISIONS.md  .env.example
+  bin/  proxy/  agent/  .claude/  stacks/php-htmx/  apps/</code></pre></div>
+    </li>
+    <li>
+      <h3>Régler l'instance</h3>
+      <div class="code"><pre><code>cd ~/mon-instance
+cp .env.example .env
+nano .env</code></pre></div>
+      <div class="tw"><table>
+        <thead><tr><th>Variable</th><th>À mettre</th></tr></thead>
+        <tbody>
+          <tr><td><code>APPS_HOST</code></td><td>l'hôte de l'étape 2, par exemple <code>apps.tondomaine.fr</code></td></tr>
+          <tr><td><code>HOST_UID</code>, <code>HOST_GID</code></td><td>le résultat de <code>id -u</code> et <code>id -g</code>. Les conteneurs tournent sous cet utilisateur : les fichiers de <code>data/</code> t'appartiennent.</td></tr>
+          <tr><td><code>STACKFAST_INSTANCE</code></td><td><code>main</code>. À changer seulement si deux instances partagent la machine.</td></tr>
+          <tr><td><span class="meta">plus tard</span></td><td><code>BACKUP_PASSPHRASE</code> pour chiffrer les sauvegardes ; <code>AGENT_CLAUDE_CODE_OAUTH_TOKEN</code> pour les agents.</td></tr>
+        </tbody>
+      </table></div>
+    </li>
+    <li>
+      <h3>Vérifier</h3>
+      <div class="code"><pre><code>stackfast          <span class="c"># liste les commandes</span>
+stackfast ls       <span class="c"># « aucune app » : normal, il n'y en a pas encore</span></code></pre></div>
+      <p>Les commandes d'instance marchent depuis n'importe quel sous-dossier de l'instance.</p>
+    </li>
+  </ol>
+
+  <div class="callout warn">
+    <b class="k">Tu as déjà un Caddy ou des projets sur ce serveur ?</b>
+    <p>Le Caddy de stackfast ne peut pas démarrer tant qu'un autre tient les ports 80 et 443. Fais d'abord une sauvegarde de tes projets actuels, puis arrête-les sans les supprimer (<code>docker stop</code>, et <code>docker update --restart=no</code> pour qu'ils ne reviennent pas au redémarrage). Leur migration, un projet à la fois, est décrite dans <code>docs/DEPLOY-VPS.md</code> (section 7) et <code>docs/SAUVEGARDE.md</code> du hub.</p>
+  </div>
+  <div class="callout info">
+    <b class="k">Quelle version ?</b>
+    <p>Les commandes <code>backup</code>, <code>restore</code> et <code>agent</code> viennent de la branche <code>stack-agents</code>. Si <code>stackfast backup</code> répond « commande inconnue », cette branche n'est pas encore fusionnée dans <code>main</code> : fusionne-la, puis <code>stackfast pull</code> (le hub) et <code>stackfast sync</code> dans l'instance.</p>
+  </div>
+</section>
+
+<section id="premier">
+  <h2>Premier projet</h2>
+  <p class="sub">De rien à une page en HTTPS, puis à un vrai nom de domaine.</p>
+
+  <h3>Créer l'app</h3>
+  <div class="code"><pre><code>stackfast new php-htmx monsite</code></pre></div>
+  <p>Le <em>slug</em> (<code>monsite</code>) est le nom court de l'app : lettres minuscules, chiffres et tirets. Il est unique dans l'instance. Voici la chronologie complète de cette commande.</p>
+
+  <figure class="fig"><div class="figscroll"><div style="min-width:760px"><svg viewBox="0 0 860 676" role="img" aria-label="Séquence de stackfast new : copie du gabarit, démarrage du conteneur, route dans Caddy, certificat au premier accès" xmlns="http://www.w3.org/2000/svg"><defs><marker id="f4-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f4-a-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-accent" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f4-a-agent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-agent" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f4-a-danger" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-danger" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f4-a-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-ok" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f4-a-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-warn" d="M0,1 L10,5 L0,9 z"/></marker></defs><line class="life" x1="84.0" y1="60" x2="84.0" y2="666"/><line class="life" x1="222.4" y1="60" x2="222.4" y2="666"/><line class="life" x1="360.8" y1="60" x2="360.8" y2="666"/><line class="life" x1="499.20000000000005" y1="60" x2="499.20000000000005" y2="666"/><line class="life" x1="637.6" y1="60" x2="637.6" y2="666"/><line class="life" x1="776.0" y1="60" x2="776.0" y2="666"/><rect class="band" x="8" y="127.0" width="844" height="24" rx="6"/><text class="t-phase" x="18" y="144.0" text-anchor="start"><tspan x="18" dy="0">1. L&#x27;app naît</tspan></text><rect class="band" x="8" y="237.0" width="844" height="24" rx="6"/><text class="t-phase" x="18" y="254.0" text-anchor="start"><tspan x="18" dy="0">2. Son conteneur démarre</tspan></text><rect class="band" x="8" y="391.0" width="844" height="24" rx="6"/><text class="t-phase" x="18" y="408.0" text-anchor="start"><tspan x="18" dy="0">3. Le proxy l&#x27;expose</tspan></text><rect class="node" x="21.799999999999997" y="14" width="124.4" height="46" rx="8"/><text class="t t-b" x="84.0" y="34" text-anchor="middle"><tspan x="84.0" dy="0">Toi</tspan></text><text class="t-m" x="84.0" y="50" text-anchor="middle"><tspan x="84.0" dy="0">terminal</tspan></text><rect class="node" x="160.2" y="14" width="124.4" height="46" rx="8"/><text class="t t-b" x="222.4" y="34" text-anchor="middle"><tspan x="222.4" dy="0">bin/new</tspan></text><text class="t-m" x="222.4" y="50" text-anchor="middle"><tspan x="222.4" dy="0">stackfast new</tspan></text><rect class="node" x="298.6" y="14" width="124.4" height="46" rx="8"/><text class="t t-b" x="360.8" y="34" text-anchor="middle"><tspan x="360.8" dy="0">Gabarit</tspan></text><text class="t-m" x="360.8" y="50" text-anchor="middle"><tspan x="360.8" dy="0">app-template</tspan></text><rect class="node" x="437.00000000000006" y="14" width="124.4" height="46" rx="8"/><text class="t t-b" x="499.20000000000005" y="34" text-anchor="middle"><tspan x="499.20000000000005" dy="0">Docker</tspan></text><text class="t-m" x="499.20000000000005" y="50" text-anchor="middle"><tspan x="499.20000000000005" dy="0">image + compose</tspan></text><rect class="node" x="575.4" y="14" width="124.4" height="46" rx="8"/><text class="t t-b" x="637.6" y="34" text-anchor="middle"><tspan x="637.6" dy="0">Caddy</tspan></text><text class="t-m" x="637.6" y="50" text-anchor="middle"><tspan x="637.6" dy="0">main-proxy</tspan></text><rect class="node" x="713.8" y="14" width="124.4" height="46" rx="8"/><text class="t t-b" x="776.0" y="34" text-anchor="middle"><tspan x="776.0" dy="0">Let&#x27;s Encrypt</tspan></text><text class="t-m" x="776.0" y="50" text-anchor="middle"><tspan x="776.0" dy="0">certificat</tspan></text><path class="edge" d="M87.0,120 L218.4,120" marker-end="url(#f4-a)"/><text class="t-s halo" x="153.2" y="112" text-anchor="middle"><tspan x="153.2" dy="0">stackfast new php-htmx monsite</tspan></text><path class="edge" d="M225.4,194 L356.8,194" marker-end="url(#f4-a)"/><text class="t-s halo" x="291.6" y="186" text-anchor="middle"><tspan x="291.6" dy="0">copie, __SLUG__ devient monsite</tspan></text><rect class="node-accent" x="71.65" y="202.0" width="301.5" height="26" rx="6"/><text class="t-s t-ink" x="222.4" y="220.0" text-anchor="middle"><tspan x="222.4" dy="0">crée .env avec le token /api (openssl rand)</tspan></text><path class="edge" d="M225.4,304 L495.20000000000005,304" marker-end="url(#f4-a)"/><text class="t-s halo" x="360.8" y="296" text-anchor="middle"><tspan x="360.8" dy="0">image de la stack ? sinon build (≈ 1 min)</tspan></text><path class="edge" d="M225.4,344 L495.20000000000005,344" marker-end="url(#f4-a)"/><text class="t-s halo" x="360.8" y="336" text-anchor="middle"><tspan x="360.8" dy="0">compose up --wait (healthcheck)</tspan></text><path class="edge dash" d="M496.20000000000005,384 L226.4,384" marker-end="url(#f4-a)"/><text class="t-s halo" x="360.8" y="376" text-anchor="middle"><tspan x="360.8" dy="0">conteneur sain</tspan></text><path class="edge edge-accent" d="M225.4,458 L633.6,458" marker-end="url(#f4-a-accent)"/><text class="t-s halo" x="430.0" y="450" text-anchor="middle"><tspan x="430.0" dy="0">bin/proxy : génère, valide, recharge</tspan></text><path class="edge" d="M87.0,498 L633.6,498" marker-end="url(#f4-a)"/><text class="t-s halo" x="360.8" y="490" text-anchor="middle"><tspan x="360.8" dy="0">https://apps.…/monsite/</tspan></text><path class="edge" d="M640.6,538 L772.0,538" marker-end="url(#f4-a)"/><text class="t-s halo" x="706.8" y="530" text-anchor="middle"><tspan x="706.8" dy="0">demande un certificat (port 80)</tspan></text><path class="edge dash" d="M773.0,578 L641.6,578" marker-end="url(#f4-a)"/><text class="t-s halo" x="706.8" y="570" text-anchor="middle"><tspan x="706.8" dy="0">certificat</tspan></text><path class="edge edge-accent" d="M634.6,618 L503.20000000000005,618" marker-end="url(#f4-a-accent)"/><text class="t-s halo" x="568.4000000000001" y="610" text-anchor="middle"><tspan x="568.4000000000001" dy="0">reverse_proxy main-monsite:8080</tspan></text><path class="edge dash" d="M634.6,658 L88.0,658" marker-end="url(#f4-a)"/><text class="t-s halo" x="360.8" y="650" text-anchor="middle"><tspan x="360.8" dy="0">200 : la page de l&#x27;app</tspan></text></svg></div></div><p class="hint">Fais glisser le schéma vers la gauche pour voir la suite.</p><figcaption>Trois temps : l'app naît du gabarit, son conteneur démarre sain, puis Caddy l'expose et obtient le certificat au premier accès.</figcaption></figure>
+
+  <p>À l'écran :</p>
+  <div class="code"><pre><code>créée      : apps/php-htmx/monsite
+token      : MONSITE_API_TOKEN (bearer /api + /mcp), dans apps/php-htmx/monsite/.env
+en ligne   : monsite → https://apps.tondomaine.fr/monsite/</code></pre></div>
+
+  <div class="tw"><table>
+    <thead><tr><th>Quand</th><th>Durée mesurée</th><th>Pourquoi</th></tr></thead>
+    <tbody>
+      <tr><td>La première app d'une stack</td><td>environ 1 minute</td><td>l'image de la stack est construite une fois (PHP, extensions, Caddy intégré).</td></tr>
+      <tr><td>Chaque app suivante</td><td>environ 8 secondes</td><td>l'image est réutilisée : seuls le gabarit et le conteneur sont créés.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Vérifier</h3>
+  <div class="code"><pre><code>curl -I https://apps.tondomaine.fr/monsite/
+stackfast ls
+stackfast logs monsite</code></pre></div>
+  <div class="code"><pre><code>APP      STACK      ÉTAT              ADRESSE
+monsite  php-htmx   running healthy   https://apps.tondomaine.fr/monsite/</code></pre></div>
+  <p>Le premier accès peut prendre quelques secondes : c'est le moment où Caddy obtient le certificat.</p>
+
+  <h3>Construire le site avec Claude Code</h3>
+  <p>Ce que tu as à cet instant est un gabarit : une petite liste d'éléments, avec son API et ses tests. Le contenu du site, c'est le travail de Claude Code, lancé dans le dossier de l'instance. Il lit <code>AGENTS.md</code> (le contrat de l'instance), puis celui de la stack, puis celui de l'app.</p>
+  <div class="code"><pre><code>cd ~/mon-instance && claude
+<span class="c"># dans Claude Code :</span>
+/new-app php-htmx monsite       <span class="c"># remplit le PRD avec toi, une question à la fois</span>
+/feature ajouter la page contact</code></pre></div>
+
+  <figure class="fig"><div class="figscroll"><div style="min-width:760px"><svg viewBox="0 0 860 214" role="img" aria-label="Boucle de travail avec Claude Code : PRD, plan validé, tests d&#x27;abord, code minimal, vérification, rétrospective" xmlns="http://www.w3.org/2000/svg"><defs><marker id="f5-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f5-a-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-accent" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f5-a-agent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-agent" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f5-a-danger" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-danger" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f5-a-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-ok" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f5-a-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-warn" d="M0,1 L10,5 L0,9 z"/></marker></defs><text class="t t-b" x="24.0" y="28" text-anchor="start"><tspan x="24.0" dy="0">À chaque tâche :</tspan></text><rect class="node" x="24.0" y="44" width="112" height="98" rx="10"/><text class="t t-b" x="80.0" y="70" text-anchor="middle"><tspan x="80.0" dy="0">PRD.md</tspan></text><text class="t-s" x="80.0" y="92" text-anchor="middle"><tspan x="80.0" dy="0">ce que l&#x27;app doit</tspan><tspan x="80.0" dy="15">faire (rien d&#x27;autre</tspan><tspan x="80.0" dy="15">n&#x27;existe)</tspan></text><path class="edge" d="M138.0,93 L161.0,93" marker-end="url(#f5-a)"/><rect class="node" x="164.0" y="44" width="112" height="98" rx="10"/><text class="t t-b" x="220.0" y="70" text-anchor="middle"><tspan x="220.0" dy="0">/feature</tspan></text><text class="t-s" x="220.0" y="92" text-anchor="middle"><tspan x="220.0" dy="0">plan dans PLAN.md</tspan><tspan x="220.0" dy="15">que tu valides</tspan></text><path class="edge" d="M278.0,93 L301.0,93" marker-end="url(#f5-a)"/><rect class="node" x="304.0" y="44" width="112" height="98" rx="10"/><text class="t t-b" x="360.0" y="70" text-anchor="middle"><tspan x="360.0" dy="0">Tests d&#x27;abord</tspan></text><text class="t-s" x="360.0" y="92" text-anchor="middle"><tspan x="360.0" dy="0">métier sans HTTP,</tspan><tspan x="360.0" dy="15">puis le HTML rendu</tspan></text><path class="edge" d="M418.0,93 L441.0,93" marker-end="url(#f5-a)"/><rect class="node" x="444.0" y="44" width="112" height="98" rx="10"/><text class="t t-b" x="500.0" y="70" text-anchor="middle"><tspan x="500.0" dy="0">Code minimal</tspan></text><text class="t-s" x="500.0" y="92" text-anchor="middle"><tspan x="500.0" dy="0">handlers fins,</tspan><tspan x="500.0" dy="15">métier dans lib/</tspan></text><path class="edge" d="M558.0,93 L581.0,93" marker-end="url(#f5-a)"/><rect class="node-accent" x="584.0" y="44" width="112" height="98" rx="10"/><text class="t t-b" x="640.0" y="70" text-anchor="middle"><tspan x="640.0" dy="0">stackfast check</tspan></text><text class="t-s" x="640.0" y="92" text-anchor="middle"><tspan x="640.0" dy="0">lint + tests ;</tspan><tspan x="640.0" dy="15">un hook le relance</tspan></text><path class="edge" d="M698.0,93 L721.0,93" marker-end="url(#f5-a)"/><rect class="node" x="724.0" y="44" width="112" height="98" rx="10"/><text class="t t-b" x="780.0" y="70" text-anchor="middle"><tspan x="780.0" dy="0">/retro</tspan></text><text class="t-s" x="780.0" y="92" text-anchor="middle"><tspan x="780.0" dy="0">une règle d&#x27;une</tspan><tspan x="780.0" dy="15">ligne si on t&#x27;a</tspan><tspan x="780.0" dy="15">corrigé</tspan></text><path class="edge edge-accent dash" d="M780.0,144 L780.0,180 L80.0,180 L80.0,146" marker-end="url(#f5-a-accent)"/><text class="t-s halo" x="430" y="174" text-anchor="middle"><tspan x="430" dy="0">une feature à la fois ; la leçon retenue s&#x27;écrit au plus bas niveau où elle est vraie</tspan></text></svg></div></div><p class="hint">Fais glisser le schéma vers la gauche pour voir la suite.</p><figcaption>La boucle imposée à Claude Code dans l'instance. Le hook de fin de tour rend la preuve (<code>stackfast check</code>) impossible à oublier.</figcaption></figure>
+
+  <p>Voici ce que contient l'app, et à quoi chaque fichier sert :</p>
+  <div class="code"><pre><code>apps/php-htmx/monsite/
+  PRD.md          <span class="c"># ce que l'app doit faire : ce qui n'y est pas n'existe pas</span>
+  AGENTS.md       <span class="c"># règles propres à l'app, et ses leçons</span>
+  index.php       <span class="c"># routes : une ligne par action</span>
+  lib/            <span class="c"># le métier, en fonctions pures (aussi la future surface /api et /mcp)</span>
+  views/          <span class="c"># pages, et fragments htmx dans views/partials/</span>
+  data/           <span class="c"># JSON, jamais servi ni commité</span>
+  tests/          <span class="c"># *_test.php, lancés par stackfast check</span>
+  compose.yml     <span class="c"># son conteneur (la base commune vient de la stack)</span>
+  .env            <span class="c"># ses secrets, jamais commité</span></code></pre></div>
+  <div class="callout info">
+    <b class="k">Le hook de fin de tour</b>
+    <p>À la fin de chaque tour, Claude Code relance <code>stackfast check</code> sur les apps touchées. Si un test est rouge, Claude est bloqué et voit l'erreur : il ne peut pas annoncer « terminé » sur du rouge sans que tu le voies.</p>
+  </div>
+
+  <h3>Lui donner un nom de domaine</h3>
+  <p>L'adresse de test <code>apps.tondomaine.fr/monsite/</code> est faite pour l'incubation. Quand le site est prêt, il passe sur son propre nom en une commande, sans toucher au code.</p>
+
+  <ol class="steps">
+    <li>
+      <h3>Pointer le DNS</h3>
+      <p>Ajoute un enregistrement A (et AAAA) pour <code>monsite.fr</code> vers l'IP du serveur, comme à l'étape 2 de l'installation.</p>
+    </li>
+    <li>
+      <h3>Le dire à stackfast</h3>
+      <div class="code"><pre><code>stackfast domain monsite monsite.fr</code></pre></div>
+      <p>La commande écrit <code>proxy/domains</code>, régénère la config de Caddy, la valide, puis la recharge sans coupure. Le certificat est demandé au premier accès.</p>
+    </li>
+  </ol>
+
+  <figure class="fig"><div class="figscroll"><div style="min-width:760px"><svg viewBox="0 0 860 330" role="img" aria-label="Trois adresses successives pour la même app : chemin sur apps.exemple.fr, sous-domaine, domaine à elle ; le conteneur ne change jamais" xmlns="http://www.w3.org/2000/svg"><defs><marker id="f6-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f6-a-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-accent" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f6-a-agent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-agent" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f6-a-danger" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-danger" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f6-a-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-ok" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f6-a-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-warn" d="M0,1 L10,5 L0,9 z"/></marker></defs><text class="t-h" x="16" y="22" text-anchor="start"><tspan x="16" dy="0">Incubation</tspan></text><rect class="node" x="16" y="34" width="240" height="44" rx="22"/><text class="t-m t-ink" x="136" y="61" text-anchor="middle"><tspan x="136" dy="0">apps.exemple.fr/monsite/</tspan></text><text class="t-s" x="16" y="108" text-anchor="start"><tspan x="16" dy="0">X-Base-Path</tspan></text><rect class="node" x="94" y="94" width="62" height="20" rx="10"/><text class="t-m t-ink" x="125" y="108" text-anchor="middle"><tspan x="125" dy="0">/monsite</tspan></text><rect class="node-ok" x="16" y="130" width="240" height="70" rx="10"/><text class="t t-b" x="136" y="154" text-anchor="middle"><tspan x="136" dy="0">même conteneur main-monsite</tspan></text><text class="t-s" x="136" y="172" text-anchor="middle"><tspan x="136" dy="0">même code, mêmes données</tspan></text><text class="t-m" x="136" y="188" text-anchor="middle"><tspan x="136" dy="0">url(&#x27;/items&#x27;) → /monsite/items</tspan></text><text class="t-h" x="310" y="22" text-anchor="start"><tspan x="310" dy="0">Mature</tspan></text><rect class="node" x="310" y="34" width="240" height="44" rx="22"/><text class="t-m t-ink" x="430" y="61" text-anchor="middle"><tspan x="430" dy="0">monsite.exemple.fr</tspan></text><text class="t-s" x="310" y="108" text-anchor="start"><tspan x="310" dy="0">X-Base-Path</tspan></text><rect class="node" x="388" y="94" width="62" height="20" rx="10"/><text class="t-m t-ink" x="419" y="108" text-anchor="middle"><tspan x="419" dy="0">/</tspan></text><rect class="node-ok" x="310" y="130" width="240" height="70" rx="10"/><text class="t t-b" x="430" y="154" text-anchor="middle"><tspan x="430" dy="0">même conteneur main-monsite</tspan></text><text class="t-s" x="430" y="172" text-anchor="middle"><tspan x="430" dy="0">même code, mêmes données</tspan></text><text class="t-m" x="430" y="188" text-anchor="middle"><tspan x="430" dy="0">url(&#x27;/items&#x27;) → /items</tspan></text><text class="t-h" x="604" y="22" text-anchor="start"><tspan x="604" dy="0">Autonome</tspan></text><rect class="node-accent" x="604" y="34" width="240" height="44" rx="22"/><text class="t-m t-ink" x="724" y="61" text-anchor="middle"><tspan x="724" dy="0">monsite.fr</tspan></text><text class="t-s" x="604" y="108" text-anchor="start"><tspan x="604" dy="0">X-Base-Path</tspan></text><rect class="node" x="682" y="94" width="62" height="20" rx="10"/><text class="t-m t-ink" x="713" y="108" text-anchor="middle"><tspan x="713" dy="0">/</tspan></text><rect class="node-ok" x="604" y="130" width="240" height="70" rx="10"/><text class="t t-b" x="724" y="154" text-anchor="middle"><tspan x="724" dy="0">même conteneur main-monsite</tspan></text><text class="t-s" x="724" y="172" text-anchor="middle"><tspan x="724" dy="0">même code, mêmes données</tspan></text><text class="t-m" x="724" y="188" text-anchor="middle"><tspan x="724" dy="0">url(&#x27;/items&#x27;) → /items</tspan></text><path class="edge edge-accent" d="M256,56 L306,56" marker-end="url(#f6-a-accent)"/><path class="edge edge-accent" d="M550,56 L600,56" marker-end="url(#f6-a-accent)"/><text class="t-s halo" x="283" y="46" text-anchor="middle"><tspan x="283" dy="0">domain</tspan></text><text class="t-s halo" x="577" y="46" text-anchor="middle"><tspan x="577" dy="0">domain</tspan></text><rect class="node" x="310" y="216" width="240" height="42" rx="8"/><text class="t-m t-ink" x="430" y="234" text-anchor="middle"><tspan x="430" dy="0">stackfast domain monsite</tspan><tspan x="430" dy="15">monsite.exemple.fr</tspan></text><rect class="node" x="604" y="216" width="240" height="42" rx="8"/><text class="t-m t-ink" x="724" y="234" text-anchor="middle"><tspan x="724" dy="0">stackfast domain monsite</tspan><tspan x="724" dy="15">monsite.fr</tspan></text><text class="t-s" x="16" y="229" text-anchor="start"><tspan x="16" dy="0">La commande à lancer :</tspan></text><text class="t-m" x="16" y="247" text-anchor="start"><tspan x="16" dy="0">aucune : créée par stackfast new</tspan></text><text class="t-s" x="16" y="292" text-anchor="start"><tspan x="16" dy="0">Chaque ancienne adresse redirige en 301 vers la nouvelle. Côté DNS, une seule chose à faire : pointer le nom vers le serveur.</tspan></text><text class="t-s" x="16" y="310" text-anchor="start"><tspan x="16" dy="0">Caddy obtient le certificat tout seul au premier accès.</tspan></text></svg></div></div><p class="hint">Fais glisser le schéma vers la gauche pour voir la suite.</p><figcaption>Le conteneur, le code et les données ne changent pas ; seul le routage de Caddy change, et l'app calcule ses liens à partir de <code>X-Base-Path</code>.</figcaption></figure>
+
+  <p>Tu peux enchaîner les adresses : <code>apps.tondomaine.fr/monsite/</code>, puis <code>monsite.tondomaine.fr</code>, puis <code>monsite.fr</code>. À chaque étape, les adresses précédentes redirigent en 301, donc aucun lien ne casse. <code>stackfast domain monsite</code> sans argument affiche l'adresse actuelle ; <code>--rm</code> retire un domaine.</p>
+  <div class="callout info">
+    <b class="k">Pourquoi le code ne change pas</b>
+    <p>L'app ne connaît jamais son adresse. Elle écrit ses liens avec <code>url('/items')</code>, qui s'appuie sur l'en-tête <code>X-Base-Path</code> posé par Caddy : <code>/monsite</code> en incubation, <code>/</code> sur un domaine. Le proxy écrase toujours cet en-tête : un client ne peut pas le choisir.</p>
+  </div>
+</section>
+
+<section id="vie">
+  <h2>Vie du projet</h2>
+  <p class="sub">Le site est en ligne. Voici ce que tu fais ensuite, du plus courant au plus rare.</p>
+
+  <h3>Modifier et déployer</h3>
+  <p>Le code de l'app est monté dans son conteneur et lu à chaud : modifier un fichier PHP ne demande ni build ni redémarrage. Le code vit dans le dépôt git de l'instance. Tu le modifies sur le serveur avec Claude Code, ou en local puis <code>git push</code> et <code>stackfast deploy</code> sur le serveur (<code>git pull</code>, puis chaque app mise à jour et le proxy régénéré). Donne à ce dépôt un remote privé : c'est la copie de ton code.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Tu changes</th><th>Tu lances</th></tr></thead>
+    <tbody>
+      <tr><td>un fichier de code (<code>index.php</code>, <code>lib/</code>, <code>views/</code>)</td><td>rien : c'est lu à chaud</td></tr>
+      <tr><td>le <code>.env</code> ou le <code>compose.yml</code> d'une app</td><td><code>stackfast up monsite</code></td></tr>
+      <tr><td>du code sur un autre poste</td><td><code>git push</code>, puis <code>stackfast deploy</code> sur le serveur</td></tr>
+      <tr><td>une stack ou stackfast lui-même (dans le hub)</td><td><code>stackfast pull</code>, puis dans l'instance <code>stackfast sync</code> et <code>stackfast deploy</code></td></tr>
+    </tbody>
+  </table></div>
+  <p><code>sync</code> s'arrête si quelqu'un a modifié à la main un fichier posé par le hub (il liste lesquels). <code>--force</code> les écrase.</p>
+
+  <h3>Regarder ce qui se passe</h3>
+  <div class="code"><pre><code>stackfast ls                  <span class="c"># apps, santé, adresses</span>
+stackfast logs monsite -f     <span class="c"># journaux, erreurs PHP comprises</span>
+stackfast shell monsite       <span class="c"># un shell dans le conteneur, avec les droits de l'app</span>
+stackfast check monsite       <span class="c"># lint + tests dans un conteneur jetable, sans réseau</span></code></pre></div>
+
+  <h3>Faire travailler des agents</h3>
+  <p>Pour avancer plusieurs chantiers en parallèle, tu lances plusieurs agents Claude Code sur la même app. Chacun reçoit une copie de l'app dans une sandbox : il peut tout casser chez lui, il ne voit ni les autres apps, ni les <code>.env</code>, ni Docker.</p>
+
+  <figure class="fig"><div class="figscroll"><div style="min-width:760px"><svg viewBox="0 0 860 450" role="img" aria-label="Agents isolés : chaque agent travaille sur sa copie de l&#x27;app dans sa sandbox ; les changements ne reviennent que par une fusion à trois voies limitée au dossier de l&#x27;app" xmlns="http://www.w3.org/2000/svg"><defs><marker id="f7-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f7-a-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-accent" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f7-a-agent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-agent" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f7-a-danger" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-danger" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f7-a-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-ok" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f7-a-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-warn" d="M0,1 L10,5 L0,9 z"/></marker></defs><rect class="zone" x="16" y="24" width="250" height="372" rx="14"/><text class="t-h" x="32" y="50" text-anchor="start"><tspan x="32" dy="0">Instance (toi)</tspan></text><rect class="node-ok" x="32" y="64" width="218" height="62" rx="8"/><text class="t-m t-ink" x="46" y="88" text-anchor="start"><tspan x="46" dy="0">apps/php-htmx/monsite/</tspan></text><text class="t-s" x="46" y="108" text-anchor="start"><tspan x="46" dy="0">le vrai code, la vraie prod</tspan></text><rect class="node" x="32" y="140" width="218" height="40" rx="8"/><text class="t-s" x="46" y="165" text-anchor="start"><tspan x="46" dy="0">.env · data/ · proxy/ : jamais copiés</tspan></text><rect class="node" x="32" y="194" width="218" height="66" rx="8"/><text class="t-m t-ink" x="46" y="214" text-anchor="start"><tspan x="46" dy="0">.agents/monsite/a1/base/</tspan></text><text class="t-s" x="46" y="232" text-anchor="start"><tspan x="46" dy="0">l&#x27;app au départ (base de la</tspan></text><text class="t-s" x="46" y="247" text-anchor="start"><tspan x="46" dy="0">fusion), jamais montée</tspan></text><text class="t-s t-agentink" x="32" y="292" text-anchor="start"><tspan x="32" dy="0">Une sandbox ne voit ni les</tspan></text><text class="t-s t-agentink" x="32" y="308" text-anchor="start"><tspan x="32" dy="0">autres apps, ni les .env,</tspan></text><text class="t-s t-agentink" x="32" y="324" text-anchor="start"><tspan x="32" dy="0">ni docker.</tspan></text><rect class="zone zone-agent" x="430" y="24" width="410" height="118" rx="14"/><text class="t-h" x="446" y="48" text-anchor="start"><tspan x="446" dy="0">Sandbox a1</tspan></text><text class="t-s" x="826" y="48" text-anchor="end"><tspan x="826" dy="0">/_preview/monsite/a1/ · mot de passe</tspan></text><rect class="node-agent" x="446" y="62" width="190" height="68" rx="8"/><text class="t t-b" x="458" y="84" text-anchor="start"><tspan x="458" dy="0">écriture</tspan></text><text class="t-s" x="458" y="102" text-anchor="start"><tspan x="458" dy="0">son app seulement</tspan><tspan x="458" dy="15">(+ data/ jetable)</tspan></text><rect class="node" x="646" y="62" width="180" height="68" rx="8"/><text class="t t-b" x="658" y="84" text-anchor="start"><tspan x="658" dy="0">lecture seule</tspan></text><text class="t-s" x="658" y="102" text-anchor="start"><tspan x="658" dy="0">stacks/, AGENTS.md,</tspan><tspan x="658" dy="15">hook de fin de tour</tspan></text><path class="edge edge-agent" d="M268,85 L428,85" marker-end="url(#f7-a-agent)"/><path class="edge edge-ok" d="M428,105 L268,105" marker-end="url(#f7-a-ok)"/><text class="t-s halo" x="348" y="79" text-anchor="middle"><tspan x="348" dy="0">agent new : copie</tspan></text><text class="t-s halo" x="348" y="120" text-anchor="middle"><tspan x="348" dy="0">apply : fusion à 3 voies</tspan></text><rect class="zone zone-agent" x="430" y="154" width="410" height="118" rx="14"/><text class="t-h" x="446" y="178" text-anchor="start"><tspan x="446" dy="0">Sandbox a2</tspan></text><text class="t-s" x="826" y="178" text-anchor="end"><tspan x="826" dy="0">/_preview/monsite/a2/ · mot de passe</tspan></text><rect class="node-agent" x="446" y="192" width="190" height="68" rx="8"/><text class="t t-b" x="458" y="214" text-anchor="start"><tspan x="458" dy="0">écriture</tspan></text><text class="t-s" x="458" y="232" text-anchor="start"><tspan x="458" dy="0">son app seulement</tspan><tspan x="458" dy="15">(+ data/ jetable)</tspan></text><rect class="node" x="646" y="192" width="180" height="68" rx="8"/><text class="t t-b" x="658" y="214" text-anchor="start"><tspan x="658" dy="0">lecture seule</tspan></text><text class="t-s" x="658" y="232" text-anchor="start"><tspan x="658" dy="0">stacks/, AGENTS.md,</tspan><tspan x="658" dy="15">hook de fin de tour</tspan></text><path class="edge edge-agent" d="M268,215 L428,215" marker-end="url(#f7-a-agent)"/><path class="edge edge-ok" d="M428,235 L268,235" marker-end="url(#f7-a-ok)"/><rect class="zone zone-agent" x="430" y="284" width="410" height="118" rx="14"/><text class="t-h" x="446" y="308" text-anchor="start"><tspan x="446" dy="0">Sandbox a3</tspan></text><text class="t-s" x="826" y="308" text-anchor="end"><tspan x="826" dy="0">/_preview/monsite/a3/ · mot de passe</tspan></text><rect class="node-agent" x="446" y="322" width="190" height="68" rx="8"/><text class="t t-b" x="458" y="344" text-anchor="start"><tspan x="458" dy="0">écriture</tspan></text><text class="t-s" x="458" y="362" text-anchor="start"><tspan x="458" dy="0">son app seulement</tspan><tspan x="458" dy="15">(+ data/ jetable)</tspan></text><rect class="node" x="646" y="322" width="180" height="68" rx="8"/><text class="t t-b" x="658" y="344" text-anchor="start"><tspan x="658" dy="0">lecture seule</tspan></text><text class="t-s" x="658" y="362" text-anchor="start"><tspan x="658" dy="0">stacks/, AGENTS.md,</tspan><tspan x="658" dy="15">hook de fin de tour</tspan></text><path class="edge edge-agent" d="M268,345 L428,345" marker-end="url(#f7-a-agent)"/><path class="edge edge-ok" d="M428,365 L268,365" marker-end="url(#f7-a-ok)"/><rect class="band" x="16" y="414" width="828" height="26" rx="6"/><text class="t-m t-ink" x="430" y="432" text-anchor="middle"><tspan x="430" dy="0">new  →  run / shell  →  ls  →  diff  →  apply  →  stackfast check  →  commit</tspan></text></svg></div></div><p class="hint">Fais glisser le schéma vers la gauche pour voir la suite.</p><figcaption>Chaque agent a sa copie, son conteneur et sa preview. Ce qu'il produit revient par <code>apply</code>, limité au dossier de l'app.</figcaption></figure>
+
+  <div class="code"><pre><code>stackfast agent new monsite a1 a2 a3                      <span class="c"># trois sandboxes (la première construit l'image)</span>
+stackfast agent run monsite a1 "ajoute un export CSV"      <span class="c"># autonome, en arrière-plan</span>
+stackfast agent shell monsite a2                           <span class="c"># ou une session interactive</span>
+stackfast agent ls                                         <span class="c"># état, fichiers changés, adresse de preview</span>
+stackfast agent diff monsite a1                            <span class="c"># ce qu'il a changé</span>
+stackfast agent apply monsite a1                           <span class="c"># fusion à 3 voies dans l'app, après ta relecture</span>
+stackfast check monsite &amp;&amp; git commit                    <span class="c"># preuve, puis commit</span></code></pre></div>
+  <ul>
+    <li>Chaque agent a une <b>preview</b> à <code>https://apps.tondomaine.fr/_preview/monsite/a1/</code>, sous mot de passe (affiché une fois, <code>stackfast agent passwd</code> pour le changer).</li>
+    <li><code>apply</code> ne copie que ce qui est dans <code>apps/&lt;stack&gt;/&lt;slug&gt;/</code>. Deux agents qui touchent le même fichier se fusionnent ; une même ligne modifiée donne un conflit signalé par des marqueurs, et <code>stackfast check</code> refuse de passer tant qu'il en reste.</li>
+    <li>Pour qu'un agent travaille, donne-lui un compte : <code>AGENT_CLAUDE_CODE_OAUTH_TOKEN</code> (issu de <code>claude setup-token</code>) ou <code>AGENT_ANTHROPIC_API_KEY</code> dans le <code>.env</code> de l'instance.</li>
+  </ul>
+  <div class="callout agent">
+    <b class="k">Ce que la sandbox ne garantit pas</b>
+    <p>L'agent a accès à Internet (il lui faut l'API Claude). Ce qu'il voit, son code et sa clé, peut sortir si une injection de prompt le lui fait faire. Aucun secret de production dans une sandbox, et une clé API dédiée aux agents. <code>agent run</code> lance Claude sans confirmations : la sandbox est la frontière, pas les questions. Détails dans <code>docs/AGENTS-ISOLES.md</code>.</p>
+  </div>
+
+  <h3>Sauvegarder et restaurer</h3>
+  <p>Le code est dans git. Les <code>data/</code> et les <code>.env</code> n'y sont pas : ils n'existent que sur le serveur. <code>stackfast backup</code> les met, avec la config d'instance et les certificats, dans une archive.</p>
+
+  <figure class="fig"><div class="figscroll"><div style="min-width:760px"><svg viewBox="0 0 860 380" role="img" aria-label="Sauvegarde : données, secrets et certificats vont dans une archive datée, chiffrable, copiée hors du serveur ; la restauration remet tout, même sur un serveur neuf" xmlns="http://www.w3.org/2000/svg"><defs><marker id="f9-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f9-a-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-accent" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f9-a-agent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-agent" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f9-a-danger" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-danger" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f9-a-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-ok" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f9-a-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-warn" d="M0,1 L10,5 L0,9 z"/></marker></defs><text class="t-h" x="16" y="24" text-anchor="start"><tspan x="16" dy="0">Ce que git ne garde pas</tspan></text><rect class="node-ok" x="16" y="40" width="230" height="44" rx="8"/><text class="t t-b" x="30" y="59" text-anchor="start"><tspan x="30" dy="0">data/ de chaque app</tspan></text><text class="t-s" x="30" y="75" text-anchor="start"><tspan x="30" dy="0">sauf les sessions</tspan></text><rect class="node-ok" x="16" y="92" width="230" height="44" rx="8"/><text class="t t-b" x="30" y="111" text-anchor="start"><tspan x="30" dy="0">.env de chaque app</tspan></text><text class="t-s" x="30" y="127" text-anchor="start"><tspan x="30" dy="0">secrets</tspan></text><rect class="node-ok" x="16" y="144" width="230" height="44" rx="8"/><text class="t t-b" x="30" y="163" text-anchor="start"><tspan x="30" dy="0">config d&#x27;instance</tspan></text><text class="t-s" x="30" y="179" text-anchor="start"><tspan x="30" dy="0">.env, Caddyfile, domaines</tspan></text><rect class="node-ok" x="16" y="196" width="230" height="44" rx="8"/><text class="t t-b" x="30" y="215" text-anchor="start"><tspan x="30" dy="0">certificats Caddy</tspan></text><text class="t-s" x="30" y="231" text-anchor="start"><tspan x="30" dy="0">évite de les redemander</tspan></text><rect class="node" x="16" y="252" width="230" height="40" rx="8"/><text class="t-s" x="30" y="277" text-anchor="start"><tspan x="30" dy="0">le code : dans git (commit + push)</tspan></text><rect class="node-accent" x="310" y="92" width="200" height="100" rx="12"/><text class="t t-b" x="410" y="120" text-anchor="middle"><tspan x="410" dy="0">stackfast backup</tspan></text><text class="t-s" x="410" y="140" text-anchor="middle"><tspan x="410" dy="0">archive datée · chmod 600</tspan></text><text class="t-s" x="410" y="156" text-anchor="middle"><tspan x="410" dy="0">relue après écriture</tspan></text><text class="t-s" x="410" y="172" text-anchor="middle"><tspan x="410" dy="0">chiffrée si BACKUP_PASSPHRASE</tspan></text><path class="edge edge-accent" d="M248,118 L308,118" marker-end="url(#f9-a-accent)"/><path class="edge edge-accent" d="M248,166 L308,166" marker-end="url(#f9-a-accent)"/><path class="edge edge-accent" d="M248,62 L280,62 L280,140 L308,140" marker-end="url(#f9-a-accent)"/><path class="edge edge-accent" d="M248,218 L280,218 L280,150 L308,150" marker-end="url(#f9-a-accent)"/><rect class="node" x="580" y="92" width="262" height="100" rx="12"/><text class="t-m t-ink" x="711" y="120" text-anchor="middle"><tspan x="711" dy="0">backups/main-2026….tar.gz(.enc)</tspan></text><text class="t-s" x="711" y="142" text-anchor="middle"><tspan x="711" dy="0">gardées : --keep 7 par défaut</tspan></text><text class="t-s" x="711" y="160" text-anchor="middle"><tspan x="711" dy="0">cron quotidien conseillé</tspan></text><path class="edge edge-accent" d="M512,142 L578,142" marker-end="url(#f9-a-accent)"/><rect class="node-warn" x="580" y="226" width="262" height="50" rx="10"/><text class="t t-b" x="711" y="248" text-anchor="middle"><tspan x="711" dy="0">copie hors du serveur</tspan></text><text class="t-s" x="711" y="265" text-anchor="middle"><tspan x="711" dy="0">rsync, rclone, scp</tspan></text><path class="edge edge-warn" d="M711,194 L711,224" marker-end="url(#f9-a-warn)"/><rect class="node-ok" x="310" y="300" width="200" height="68" rx="10"/><text class="t t-b" x="410" y="326" text-anchor="middle"><tspan x="410" dy="0">stackfast restore</tspan></text><text class="t-s" x="410" y="346" text-anchor="middle"><tspan x="410" dy="0">une app, ou tout (--certs)</tspan></text><text class="t-s" x="410" y="360" text-anchor="middle"><tspan x="410" dy="0">l&#x27;ancien état mis de côté</tspan></text><path class="edge edge-ok" d="M711,276 L711,334 L512,334" marker-end="url(#f9-a-ok)"/><text class="t-s halo" x="600" y="326" text-anchor="middle"><tspan x="600" dy="0">même archive</tspan></text><rect class="node" x="16" y="304" width="230" height="62" rx="8"/><text class="t t-b" x="30" y="326" text-anchor="start"><tspan x="30" dy="0">Serveur détruit ?</tspan></text><text class="t-s" x="30" y="344" text-anchor="start"><tspan x="30" dy="0">install → git pull → restore --certs</tspan><tspan x="30" dy="15">(testé : 16 s)</tspan></text><path class="edge edge-ok" d="M310,334 L248,334" marker-end="url(#f9-a-ok)"/></svg></div></div><p class="hint">Fais glisser le schéma vers la gauche pour voir la suite.</p><figcaption>Les secrets et les données sont les seules choses à ne pas pouvoir reconstruire depuis git : elles sont sauvegardées, chiffrables, puis copiées ailleurs.</figcaption></figure>
+
+  <div class="code"><pre><code>stackfast backup                        <span class="c"># → backups/main-2026….tar.gz (chiffrée si BACKUP_PASSPHRASE)</span>
+stackfast backup --keep 14              <span class="c"># garde les 14 dernières</span>
+stackfast restore &lt;archive&gt; --list      <span class="c"># voir le contenu sans rien toucher</span>
+stackfast restore &lt;archive&gt; monsite    <span class="c"># une app : ses data/ et son .env</span>
+stackfast restore &lt;archive&gt; --certs    <span class="c"># tout, certificats compris (serveur neuf)</span></code></pre></div>
+  <p>Une sauvegarde sur le même disque ne protège pas d'une panne du serveur. Mets-la en cron, puis copie-la ailleurs :</p>
+  <div class="code"><pre><code>0 3 * * * cd ~/mon-instance &amp;&amp; stackfast backup --keep 14 &amp;&amp; rsync -a backups/ moi@autre-machine:sauvegardes/</code></pre></div>
+  <p>Serveur détruit ? Installe Docker et stackfast, récupère le code (<code>git pull</code>), copie l'archive, puis <code>stackfast restore &lt;archive&gt; --certs</code>. Dans le test de sinistre (conteneurs, volumes, images, <code>.env</code> et données supprimés), tout est revenu en 16 secondes, avec le même certificat. Ce qui est remplacé n'est jamais écrasé : l'ancien état va dans <code>backups/pre-restore/</code>. <code>stackfast audit</code> te signale l'absence de sauvegarde récente.</p>
+
+  <h3>Appliquer un correctif de sécurité</h3>
+  <p>Quand une faille PHP est annoncée (comme PHP2Shell, en octobre 2026, corrigée en 8.5.12), la procédure tient en deux commandes, sur chaque serveur :</p>
+  <div class="code"><pre><code>stackfast audit      <span class="c"># « PHP 8.5.11 : OBSOLÈTE, 8.5.12 est publié »</span>
+stackfast update     <span class="c"># reconstruit, teste toutes les apps, bascule, puis audit</span></code></pre></div>
+
+  <figure class="fig"><div class="figscroll"><div style="min-width:760px"><svg viewBox="0 0 860 340" role="img" aria-label="Correctif de sécurité PHP : audit détecte, update construit une image candidate, teste toutes les apps, bascule seulement si tout est vert, puis recrée les conteneurs" xmlns="http://www.w3.org/2000/svg"><defs><marker id="f8-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f8-a-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-accent" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f8-a-agent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-agent" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f8-a-danger" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-danger" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f8-a-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-ok" d="M0,1 L10,5 L0,9 z"/></marker><marker id="f8-a-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-warn" d="M0,1 L10,5 L0,9 z"/></marker></defs><rect class="node-warn" x="20" y="24" width="132" height="80" rx="10"/><text class="t t-b" x="86.0" y="50" text-anchor="middle"><tspan x="86.0" dy="0">php.net publie</tspan></text><text class="t-s" x="86.0" y="70" text-anchor="middle"><tspan x="86.0" dy="0">PHP 8.5.12</tspan><tspan x="86.0" dy="15">(faille PHP2Shell)</tspan></text><rect class="node-warn" x="192" y="24" width="132" height="80" rx="10"/><text class="t t-b" x="258.0" y="50" text-anchor="middle"><tspan x="258.0" dy="0">stackfast audit</tspan></text><text class="t-s" x="258.0" y="70" text-anchor="middle"><tspan x="258.0" dy="0">OBSOLÈTE : 8.5.11</tspan><tspan x="258.0" dy="15">exit 1</tspan></text><rect class="node-accent" x="364" y="24" width="132" height="80" rx="10"/><text class="t t-b" x="430.0" y="50" text-anchor="middle"><tspan x="430.0" dy="0">1. Construire</tspan></text><text class="t-s" x="430.0" y="70" text-anchor="middle"><tspan x="430.0" dy="0">image candidate :next</tspan><tspan x="430.0" dy="15">base retéléchargée</tspan></text><rect class="node-accent" x="536" y="24" width="132" height="80" rx="10"/><text class="t t-b" x="602.0" y="50" text-anchor="middle"><tspan x="602.0" dy="0">2. Tester</tspan></text><text class="t-s" x="602.0" y="70" text-anchor="middle"><tspan x="602.0" dy="0">lint + tests de</tspan><tspan x="602.0" dy="15">toutes les apps</tspan></text><rect class="node-ok" x="708" y="24" width="132" height="80" rx="10"/><text class="t t-b" x="774.0" y="50" text-anchor="middle"><tspan x="774.0" dy="0">3. Basculer</tspan></text><text class="t-s" x="774.0" y="70" text-anchor="middle"><tspan x="774.0" dy="0">:current devient</tspan><tspan x="774.0" dy="15">:previous</tspan></text><path class="edge" d="M155,64 L188,64" marker-end="url(#f8-a)"/><path class="edge" d="M327,64 L360,64" marker-end="url(#f8-a)"/><path class="edge" d="M499,64 L532,64" marker-end="url(#f8-a)"/><path class="edge edge-ok" d="M671,64 L704,64" marker-end="url(#f8-a-ok)"/><text class="t-s halo" x="688.0" y="54" text-anchor="middle"><tspan x="688.0" dy="0">ok</tspan></text><path class="edge edge-danger" d="M602.0,106 L602.0,166" marker-end="url(#f8-a-danger)"/><text class="t-s halo" x="594.0" y="140" text-anchor="end"><tspan x="594.0" dy="0">test rouge</tspan></text><rect class="node-danger" x="520.0" y="168" width="164" height="84" rx="10"/><text class="t t-b" x="602.0" y="192" text-anchor="middle"><tspan x="602.0" dy="0">Arrêt immédiat</tspan></text><text class="t-s" x="602.0" y="212" text-anchor="middle"><tspan x="602.0" dy="0">rien n&#x27;a changé,</tspan><tspan x="602.0" dy="15">les apps restent en ligne</tspan></text><path class="edge edge-ok" d="M774.0,106 L774.0,166" marker-end="url(#f8-a-ok)"/><rect class="node-ok" x="700.0" y="168" width="148" height="84" rx="10"/><text class="t t-b" x="774.0" y="192" text-anchor="middle"><tspan x="774.0" dy="0">4. Recréer</tspan></text><text class="t-s" x="774.0" y="212" text-anchor="middle"><tspan x="774.0" dy="0">chaque conteneur +</tspan><tspan x="774.0" dy="15">image des sandboxes</tspan></text><path class="edge edge-ok" d="M774.0,254 L774.0,284" marker-end="url(#f8-a-ok)"/><rect class="node" x="700.0" y="286" width="148" height="44" rx="10"/><text class="t t-b" x="774.0" y="306" text-anchor="middle"><tspan x="774.0" dy="0">stackfast audit</tspan></text><text class="t-s" x="774.0" y="321" text-anchor="middle"><tspan x="774.0" dy="0">« rien à faire »</tspan></text><rect class="node" x="192" y="286" width="190" height="44" rx="10"/><text class="t t-b" x="287" y="306" text-anchor="middle"><tspan x="287" dy="0">stackfast rollback</tspan></text><text class="t-s" x="287" y="321" text-anchor="middle"><tspan x="287" dy="0">revient à :previous si besoin</tspan></text><path class="edge dash" d="M698.0,308 L384,308" marker-end="url(#f8-a)"/><text class="t-s halo" x="541.0" y="300" text-anchor="middle"><tspan x="541.0" dy="0">si problème après coup</tspan></text></svg></div></div><p class="hint">Fais glisser le schéma vers la gauche pour voir la suite.</p><figcaption>Une image candidate est testée avant toute bascule. Un test rouge arrête tout sans rien changer ; <code>rollback</code> permet de revenir.</figcaption></figure>
+
+  <ul>
+    <li><b>La branche PHP est fixée</b> dans <code>stack.conf</code> (8.5), le correctif ne l'est pas : <code>update</code> reconstruit avec le dernier PHP 8.5.x publié.</li>
+    <li><b>Un conteneur déjà lancé garde l'ancien PHP en mémoire.</b> C'est pourquoi <code>update</code> recrée chaque conteneur, et pourquoi <code>audit</code> signale ceux qui tournent encore sur l'ancienne image, apps et agents compris.</li>
+    <li>Si l'image amont n'a pas encore le correctif (php.net publie parfois quelques heures avant), <code>audit</code> le dit. En attendant, les réglages de durcissement de la stack sont déjà actifs, et tu relances <code>update</code> plus tard.</li>
+    <li>Mets <code>stackfast audit</code> en cron : il sort en erreur dès qu'il y a une action à faire.</li>
+  </ul>
+
+  <h3>Arrêter une app</h3>
+  <div class="code"><pre><code>stackfast down monsite     <span class="c"># arrête le conteneur et son réseau ; fichiers et data/ restent</span>
+stackfast up monsite       <span class="c"># la relance</span></code></pre></div>
+  <p>Il n'existe pas encore de commande pour supprimer définitivement une app : retire son dossier avec git, puis <code>stackfast domain monsite --rm &lt;domaine&gt;</code> et <code>stackfast proxy</code>.</p>
+</section>
+
+<section id="memo">
+  <h2>Aide-mémoire</h2>
+  <p class="sub">Les commandes, rangées par moment de la vie d'une app. <code>stackfast</code> seul les liste.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Moment</th><th>Commande</th><th>Effet</th></tr></thead>
+    <tbody>
+      <tr><td>Créer</td><td><code>stackfast new php-htmx &lt;slug&gt;</code></td><td>gabarit, <code>.env</code> et token, conteneur, route, adresse</td></tr>
+      <tr><td>Voir</td><td><code>stackfast ls</code> · <code>logs &lt;slug&gt; -f</code> · <code>shell &lt;slug&gt;</code></td><td>état, journaux, shell dans le conteneur</td></tr>
+      <tr><td>Vérifier</td><td><code>stackfast check [slug]</code></td><td>lint, tests, marqueurs de conflit</td></tr>
+      <tr><td>Adresse</td><td><code>stackfast domain &lt;slug&gt; [domaine | --rm domaine]</code></td><td>nouvelle adresse, anciennes en 301</td></tr>
+      <tr><td>Appliquer un changement</td><td><code>stackfast up &lt;slug&gt;</code> · <code>up --all</code> · <code>down &lt;slug&gt;</code></td><td>démarre ou applique la config d'une app, ou l'arrête</td></tr>
+      <tr><td>Déployer</td><td><code>stackfast deploy</code></td><td><code>git pull</code>, toutes les apps, proxy</td></tr>
+      <tr><td>Agents</td><td><code>stackfast agent new | run | shell | ls | diff | apply | rm</code></td><td>sandboxes isolées, previews, fusion</td></tr>
+      <tr><td>Sauvegarder</td><td><code>stackfast backup</code> · <code>restore &lt;archive&gt; [slug]</code></td><td>data, secrets, config, certificats</td></tr>
+      <tr><td>Sécurité</td><td><code>stackfast audit</code> · <code>update</code> · <code>rollback &lt;stack&gt;</code></td><td>détecter, corriger, revenir</td></tr>
+      <tr><td>Proxy</td><td><code>stackfast proxy</code></td><td>régénère, valide et recharge Caddy</td></tr>
+      <tr><td>Faire évoluer stackfast</td><td><code>stackfast pull</code> puis <code>sync</code> puis <code>deploy</code></td><td>hub, puis instance, puis apps</td></tr>
+      <tr><td>Migrer un ancien projet</td><td><code>stackfast migrate php-htmx &lt;slug&gt;</code></td><td>depuis l'ancien modèle à conteneur partagé</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="pannes">
+  <h2>Quand ça ne marche pas</h2>
+  <p class="sub">Les symptômes rencontrés pendant les tests, avec leur cause.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Symptôme</th><th>Cause probable</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>502 sur l'adresse de l'app</td><td>le conteneur est arrêté ou pas sain</td><td><code>stackfast ls</code>, puis <code>logs &lt;slug&gt;</code>, puis <code>up &lt;slug&gt;</code></td></tr>
+      <tr><td>Pas de certificat, erreur TLS</td><td>le DNS ne pointe pas encore vers le serveur, ou les ports 80/443 ne sont pas joignables</td><td>vérifie le DNS ; <code>docker logs main-proxy</code> ; ouvre 80 et 443 (TCP, et UDP 443)</td></tr>
+      <tr><td>Le proxy ne démarre pas</td><td>un autre Caddy ou nginx tient les ports 80/443</td><td>arrête-le (voir l'encadré de l'installation)</td></tr>
+      <tr><td><code>.env manquant</code></td><td>l'instance n'a pas son <code>.env</code></td><td><code>cp .env.example .env</code>, ou <code>stackfast restore</code></td></tr>
+      <tr><td>Fichiers de <code>data/</code> appartenant à root</td><td><code>HOST_UID</code> et <code>HOST_GID</code> faux</td><td>corrige <code>.env</code>, puis <code>stackfast up --all</code></td></tr>
+      <tr><td><code>sync</code> s'arrête</td><td>un fichier posé par le hub a été modifié à la main</td><td>reporte la modif dans le hub, ou <code>sync --force</code></td></tr>
+      <tr><td><code>audit</code> : OBSOLÈTE</td><td>un correctif PHP est publié</td><td><code>stackfast update</code> (si l'image amont n'est pas prête, réessaie plus tard)</td></tr>
+      <tr><td><code>audit</code> : ANCIENNE IMAGE</td><td>un conteneur n'a pas été recréé</td><td><code>stackfast up &lt;slug&gt;</code> ou <code>stackfast agent start &lt;slug&gt; &lt;nom&gt;</code></td></tr>
+      <tr><td>Une sandbox d'agent a disparu après un redémarrage</td><td>les agents ne redémarrent pas seuls</td><td><code>stackfast agent start &lt;slug&gt; &lt;nom&gt;</code> (ses fichiers sont conservés)</td></tr>
+      <tr><td><code>check</code> signale des « conflits »</td><td><code>agent apply</code> a laissé des marqueurs <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code></td><td>résous-les dans le fichier cité, puis relance <code>check</code></td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Ce qui est vérifié, et ce qui ne l'est pas</h3>
+  <div class="callout ok">
+    <b class="k">Testé sur un vrai Docker</b>
+    <p>Création d'app, parcours des trois adresses, isolation entre apps, conteneur durci, <code>check</code>, <code>audit</code> et <code>update</code> avec un vrai PHP 8.5.11 vulnérable, <code>rollback</code>, trois agents en parallèle avec fusion et conflit, <code>backup</code> et <code>restore</code> avec sinistre simulé.</p>
+  </div>
+  <div class="callout warn">
+    <b class="k">Pas encore éprouvé</b>
+    <p>Un vrai serveur avec un DNS public : l'obtention des certificats Let's Encrypt et l'ouverture des ports 80/443 depuis Internet. Claude Code avec un vrai compte dans une sandbox d'agent. <code>stackfast migrate</code> sur un ancien serveur dont les conteneurs tournent. Le premier déploiement réel est donc aussi le test de ces trois points : garde l'ancien état de côté jusqu'à ce qu'ils passent.</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Pour aller plus loin, dans le hub : <code>docs/DEPLOY-VPS.md</code> (déploiement et migration), <code>docs/SAUVEGARDE.md</code>, <code>docs/SECURITE.md</code>, <code>docs/AGENTS-ISOLES.md</code>, <code>DECISIONS.md</code> (le pourquoi de chaque choix).</p>
+  </div>
+</footer>
+
+<script>
+(function(){
+  document.querySelectorAll('.code').forEach(function(box){
+    var btn=document.createElement('button');
+    btn.type='button'; btn.className='cp'; btn.textContent='Copier';
+    btn.addEventListener('click',function(){
+      var pre=box.querySelector('pre'); var txt=pre.innerText.replace(/ /g,' ');
+      function done(){ btn.textContent='Copié'; setTimeout(function(){btn.textContent='Copier';},1500); }
+      function fallback(){
+        try{ var r=document.createRange(); r.selectNodeContents(pre); var s=window.getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent='Sélectionné'; setTimeout(function(){btn.textContent='Copier';},1500);}catch(e){}
+      }
+      try{ navigator.clipboard.writeText(txt).then(done,fallback); }catch(e){ fallback(); }
+    });
+    box.appendChild(btn);
+  });
+})();
+</script>
+</body>
+</html>
