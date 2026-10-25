@@ -14,6 +14,11 @@ for slug in "$@"; do
   stack="$(app_stack "$slug")"
   image_stale "$stack" && "$ROOT/bin/update" --build-only "$stack"
   [ -f "$(app_dir "$slug")/.env" ] || die "$(app_dir "$slug")/.env manquant"
+  # Dépendances composer propres à l'app : installées si vendor/ manque ou si composer.lock est plus récent (après un git pull).
+  d="$(app_dir "$slug")"
+  if [ -f "$d/composer.lock" ] && { [ ! -f "$d/vendor/autoload.php" ] || [ "$d/composer.lock" -nt "$d/vendor/autoload.php" ]; }; then
+    "$ROOT/bin/composer" "$slug" install --no-dev
+  fi
   compose_app "$slug" up -d --remove-orphans --wait --wait-timeout 60 \
     || die "$slug ne démarre pas sainement : stackfast logs $slug"
   say en\ ligne "$slug → $(app_url "$slug")"

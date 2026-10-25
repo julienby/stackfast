@@ -9,7 +9,7 @@ Ma façon de coder avec une IA, et les stacks qui vont avec. Ce repo est le **hu
 | **Méthode** | `~/.claude/CLAUDE.md` (Codex : `~/.codex/AGENTS.md`) | comment je travaille, Lessons globales | le hub (`INIT/CLAUDE.global.md`) |
 | **Instance** | un repo par VPS | `AGENTS.md`, `bin/`, `proxy/` (Caddy), `.env`, `apps/` | gabarit du hub, puis le VPS |
 | **Stack** | `stacks/<stack>/` dans l'instance | image, base du conteneur, helpers partagés, `AGENTS.md` de la stack, `app-template/` | **le hub uniquement**, resynchronisé par `stackfast sync` |
-| **App** | `apps/<stack>/<slug>/` | `PRD.md`, `AGENTS.md`, `compose.yml`, `.env`, `index.php`, `lib/`, `views/`, `data/`, `tests/` | l'app |
+| **App** | `apps/<stack>/<slug>/` | `PRD.md`, `AGENTS.md`, `compose.yml`, `.env`, `index.php`, `routes.php`, `models/`, `controllers/`, `views/`, `data/`, `tests/` | l'app |
 
 **Un conteneur par app**, tous construits sur l'image de leur stack, un seul Caddy devant. Une app naît sur `https://apps.domaine.fr/<slug>/`, puis passe à `<slug>.domaine.fr`, puis à son propre domaine : une commande à chaque fois, zéro changement de code, les anciennes adresses redirigent.
 

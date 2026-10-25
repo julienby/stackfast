@@ -11,10 +11,13 @@
 
 ## Fichiers
 
-- `index.php` : routes, une ligne par action. Handler fin : lit la requête, appelle `lib/`, rend une vue.
-- `lib/` : métier, fonctions pures sans HTTP. La liste des fonctions doit se lire comme la liste des futurs outils MCP.
-- `lib/api.php` (`api_endpoints()`) et `lib/mcp.php` (`mcp_tools()`) : ce que `/api` et `/mcp` exposent. Vides par défaut, à remplir dès qu'une donnée ou une action de cette app doit être accessible en dehors de l'UI (voir « API et MCP » dans `stacks/php-htmx/AGENTS.md`).
-- `views/` : pages ; `views/partials/` : fragments renvoyés aux requêtes htmx.
+Organisation MVC de la stack (détail dans `stacks/php-htmx/AGENTS.md`) : une ressource = `models/x.php` + `controllers/x.php` + `views/x/`, et une ligne par action dans `routes.php`.
+
+- `routes.php` : toutes les routes, `'GET /items/{id}' => 'items_show'`. C'est la table des matières de l'app.
+- `models/` : le métier, en fonctions pures sans HTTP. La liste des fonctions doit se lire comme la liste des futurs outils MCP.
+- `controllers/` : une fonction par action. `controllers/api.php` (`api_endpoints()`) et `controllers/mcp.php` (`mcp_tools()`) exposent `/api` et `/mcp` : vides par défaut, à remplir dès qu'une donnée ou une action doit être accessible hors de l'UI.
+- `views/` : une page par action (`views/items/index.php`), un fragment htmx commence par `_` (`views/items/_list.php`), `layout.php` enveloppe les pages.
+- `index.php` et `init.php` : le câblage. On n'y ajoute pas d'actions.
 - `data/` : JSON à plat, un fichier par collection, et les sessions (`data/.sessions`). Gitignoré.
 - `compose.yml` : le conteneur de l'app (base dans la stack). Un conteneur en plus seulement si l'architecture l'impose, avec une décision ci-dessous.
 - `.env` : secrets de cette app seulement (`<SLUG>_API_TOKEN`…). Gitignoré. Après une modif : `stackfast up __SLUG__`.

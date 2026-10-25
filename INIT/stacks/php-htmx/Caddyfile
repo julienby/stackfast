@@ -14,7 +14,7 @@
 	encode zstd gzip
 
 	# Jamais servis : code, vues, données, tests, services (comme l'ancien .htaccess).
-	@private_dirs path /lib /lib/* /views /views/* /data /data/* /tests /tests/* /services /services/*
+	@private_dirs path /lib /lib/* /models /models/* /controllers /controllers/* /views /views/* /vendor /vendor/* /data /data/* /tests /tests/* /services /services/* /init.php /routes.php
 	# Fichiers sensibles qui existent sur le disque (une route /x.json qui n'est pas un fichier passe à index.php).
 	@private_files {
 		path */.* *.md *.json *.lock *.log *.tmp *.yml *.yaml *.ini *.sh *.sqlite *.db

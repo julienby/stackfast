@@ -56,17 +56,17 @@ Tu veux la règle « les dates s'affichent au format JJ/MM/AAAA ».
 
 ## Exemple 4 — Une modif locale dans `stacks/`
 
-Sur le VPS, tu corriges vite un bug dans `stacks/php-htmx/lib/bootstrap.php`. Puis tu lances `stackfast sync`.
+Sur le VPS, tu corriges vite un bug dans `stacks/php-htmx/lib/stack.php`. Puis tu lances `stackfast sync`.
 
 ```
 Modifs locales dans stacks/php-htmx (depuis la dernière sync) :
-./lib/bootstrap.php
+./lib/stack.php
 stackfast : reporte-les dans le hub, ou écrase-les : stackfast sync --force
 ```
 
 La sync s'arrête. Rien n'est effacé. Deux choix :
 
-- **Garder la correction** : reporte-la dans `~/.stackfast/INIT/stacks/php-htmx/lib/bootstrap.php`, `stackfast push`, puis sur le VPS `stackfast pull` et `stackfast sync --force`.
+- **Garder la correction** : reporte-la dans `~/.stackfast/INIT/stacks/php-htmx/lib/stack.php`, `stackfast push`, puis sur le VPS `stackfast pull` et `stackfast sync --force`.
 - **Jeter la correction** : `stackfast sync --force`.
 
 Comment ça marche : chaque sync écrit `stacks/<stack>/.stackfast-sums`, la somme sha256 de chaque fichier posé. La sync suivante compare. Un fichier modifié, ajouté ou supprimé à la main bloque. Un fichier changé par le **hub** ne bloque pas : le manifeste décrit ce que la dernière sync a posé, pas ce que le hub contient maintenant.
@@ -167,7 +167,7 @@ Caddy sert `localhost` avec un certificat local : `-k` pour curl.
 ```sh
 curl -k https://localhost/demo/                              # page complète
 curl -k -H 'HX-Request: true' https://localhost/demo/         # fragment htmx seul
-curl -k -o /dev/null -w '%{http_code}\n' https://localhost/demo/lib/items.php          # 404 attendu
+curl -k -o /dev/null -w '%{http_code}\n' https://localhost/demo/models/items.php          # 404 attendu
 curl -k -o /dev/null -w '%{http_code}\n' -X POST https://localhost/demo/items -d 'label=x'  # 403, pas de CSRF
 stackfast ls                                                  # demo : running healthy
 ```

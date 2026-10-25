@@ -7,3 +7,4 @@ proxy/generated.caddy*
 proxy/preview-auth
 backups/
 .restore.*/
+apps/*/*/vendor/

@@ -2,15 +2,7 @@
 // Test CLI de la surface /api + /mcp partagée (stacks/php-htmx/lib/mcp_api.php), sans HTTP.
 declare(strict_types=1);
 
-define('APP', dirname(__DIR__));
-// dirname(APP, 2) = / en conteneur (app montée en /app) ; dirname(APP, 3) en local (repo entier).
-foreach ([dirname(APP, 2), dirname(APP, 3)] as $root) {
-    if (is_file($root . '/stacks/php-htmx/lib/bootstrap.php')) {
-        require_once $root . '/stacks/php-htmx/lib/bootstrap.php';
-        require_once $root . '/stacks/php-htmx/lib/mcp_api.php';
-        break;
-    }
-}
+require dirname(__DIR__) . '/init.php';
 
 use function Stack\{mcp_handle, token_env};
 

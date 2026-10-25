@@ -59,7 +59,7 @@ Après `apply`, la base de l'agent avance : un second `apply` ne rejoue pas ses 
 - `agent run` lance Claude Code avec `--dangerously-skip-permissions` : la sandbox est la frontière, pas les confirmations. `agent shell` garde les confirmations normales.
 - Les agents ne redémarrent pas seuls après un reboot du serveur (sandbox volontairement jetable) : `stackfast agent start <slug> <nom>` ; leurs fichiers sont conservés, un `run` en cours est perdu.
 - `stackfast update` reconstruit aussi l'image des sandboxes ; `stackfast audit` liste les agents qui tournent sur l'ancienne (`stackfast agent start` les recrée). Une sandbox sert une preview sur Internet : même exigence de correctifs que les apps.
-- Plusieurs agents sur **le même fichier** se fusionnent avec conflits possibles : découper les tâches par zone (`lib/`, `views/`) les évite.
+- Plusieurs agents sur **le même fichier** se fusionnent avec conflits possibles : découper les tâches par zone (`models/`, `views/`) les évite.
 
 ## Dans le détail
 

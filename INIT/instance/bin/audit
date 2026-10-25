@@ -47,6 +47,17 @@ if [ -n "$(agents)" ]; then
   [ -s "$flag" ] && status=1
 fi
 
+# Dépendances composer : failles connues dans les paquets verrouillés de la stack et de chaque app.
+echo "## dépendances composer"
+for lockdir in stacks/* $(for f in apps/*/*/composer.lock; do [ -f "$f" ] && dirname "$f"; done); do
+  [ -f "$lockdir/composer.lock" ] || continue
+  if out="$(docker run --rm -v "$ROOT/$lockdir:/app:ro" -w /app composer:2 composer audit --locked --no-interaction 2>&1)"; then
+    echo "  $lockdir : aucune faille connue"
+  else
+    echo "  $lockdir : FAILLES → stackfast composer <slug> update, ou stackfast update"; echo "$out" | sed 's/^/    /' | head -12; status=1
+  fi
+done
+
 # Sauvegardes : données et .env ne sont que sur ce serveur (data/ et .env sont hors git).
 echo "## sauvegardes"
 lb="$(last_backup)"

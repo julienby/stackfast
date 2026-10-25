@@ -10,7 +10,7 @@ ARG BASE_IMAGE=dunglas/frankenphp:1-php8.5-trixie
 
 FROM composer:2 AS deps
 WORKDIR /app
-COPY composer.json composer.lock* ./
+COPY composer.json composer.lock ./
 RUN composer install --no-dev --prefer-dist --no-progress --no-interaction
 
 FROM ${BASE_IMAGE} AS app

@@ -1,5 +1,5 @@
 <?php
-// Surface API + MCP partagée par toutes les apps. Chargé par api.php/mcp.php : require + `use function Stack\...`.
+// Surface API + MCP partagée par toutes les apps. Chargé par init.php (controllers/api.php et mcp.php l'utilisent) : require + `use function Stack\...`.
 // Contrat : actives par défaut, 200 même vides ; un bearer token par app (`<SLUG>_API_TOKEN`) protège les deux.
 declare(strict_types=1);
 
