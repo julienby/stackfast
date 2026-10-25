@@ -7,10 +7,14 @@ cd "$ROOT"
 die() { echo "stackfast : $*" >&2; exit 1; }
 say() { printf '%-10s : %s\n' "$1" "$2"; }
 
-[ -f .env ] || die ".env manquant : cp .env.example .env"
-set -a
-. ./.env
-set +a
+# .env d'instance obligatoire, sauf pour `restore` (qui le restaure d'une sauvegarde : STACKFAST_ALLOW_NO_ENV=1).
+if [ -f .env ]; then
+  set -a
+  . ./.env
+  set +a
+elif [ "${STACKFAST_ALLOW_NO_ENV:-}" != 1 ]; then
+  die ".env manquant : cp .env.example .env"
+fi
 INSTANCE="${STACKFAST_INSTANCE:-main}"
 PROXY="$INSTANCE-proxy"
 
@@ -105,4 +109,20 @@ agent_url() {
   if [ -n "${APPS_HOST:-}" ]; then echo "https://$APPS_HOST/_preview/$1/$2/"
   else echo "(APPS_HOST manquant dans .env)"
   fi
+}
+
+# --- Sauvegardes ---
+# cat_archive <fichier> : flux tar.gz en clair (déchiffre une archive .enc avec BACKUP_PASSPHRASE).
+cat_archive() {
+  case "$1" in
+    *.enc)
+      [ -n "${BACKUP_PASSPHRASE:-}" ] || die "archive chiffrée : exporte BACKUP_PASSPHRASE (la phrase utilisée à la sauvegarde)"
+      openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_PASSPHRASE -in "$1" ;;
+    *) cat "$1" ;;
+  esac
+}
+
+# last_backup : chemin de la sauvegarde la plus récente de cette instance (vide s'il n'y en a pas).
+last_backup() {
+  ls -1t "${BACKUP_DIR:-backups}/$INSTANCE"-*.tar.gz* 2>/dev/null | head -1 || true
 }

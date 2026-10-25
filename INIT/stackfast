@@ -21,6 +21,8 @@ Dans une instance (n'importe quel sous-dossier) — les apps :
   audit                   sécurité : version PHP servie vs dernier correctif, apps sur une ancienne image
   update [<stack>|proxy]  reconstruit avec le dernier correctif, teste toutes les apps, bascule
   rollback <stack>        revient à l'image précédente
+  backup [<slug>…]        sauvegarde data/ + .env de chaque app, config d'instance, certificats (chiffrable)
+  restore <archive> [<slug>…]  restaure (--list pour voir, --certs, --no-instance) ; l'ancien état est mis de côté
   agent <verbe> …         agents isolés sur une app : new, run, shell, ls, diff, apply, stop, rm (stackfast agent --help)
   deploy                  git pull + up --all (sur le VPS)
   proxy                   régénère et recharge Caddy
@@ -222,7 +224,7 @@ case "$cmd" in
   init)    cmd_init "$@" ;;
   sync)    cmd_sync "$@" ;;
   new-app) cmd_instance new "$@" ;;
-  new|ls|domain|check|up|down|logs|shell|audit|update|rollback|deploy|proxy|migrate|agent)
+  new|ls|domain|check|up|down|logs|shell|audit|update|rollback|deploy|proxy|migrate|agent|backup|restore)
            cmd_instance "$cmd" "$@" ;;
   *)       usage ;;
 esac

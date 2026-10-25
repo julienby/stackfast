@@ -47,6 +47,17 @@ if [ -n "$(agents)" ]; then
   [ -s "$flag" ] && status=1
 fi
 
+# Sauvegardes : données et .env ne sont que sur ce serveur (data/ et .env sont hors git).
+echo "## sauvegardes"
+lb="$(last_backup)"
+if [ -z "$lb" ]; then
+  echo "  aucune sauvegarde → stackfast backup"; status=1
+else
+  age=$(( ( $(date +%s) - $(stat -c %Y "$lb") ) / 86400 ))
+  if [ "$age" -gt "${BACKUP_MAX_AGE_DAYS:-2}" ]; then echo "  dernière : $(basename "$lb") (il y a $age j) → stackfast backup"; status=1
+  else echo "  dernière : $(basename "$lb") (il y a $age j)"; fi
+fi
+
 echo "## proxy"
 if docker inspect "$PROXY" >/dev/null 2>&1; then
   echo "  $(docker exec "$PROXY" caddy version | cut -d' ' -f1), image du $(docker inspect -f '{{.Created}}' "$(docker inspect -f '{{.Image}}' "$PROXY")" | cut -c1-10) (stackfast update proxy pour la rafraîchir)"

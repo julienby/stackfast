@@ -1,0 +1,125 @@
+#!/usr/bin/env sh
+# Restaure une sauvegarde faite par bin/backup, sur ce serveur ou sur un neuf.
+#   bin/restore <archive> --list                    contenu de l'archive, sans rien toucher
+#   bin/restore <archive> [<slug>…] [--instance] [--no-instance] [--certs]
+# Sans slug : tout (config d'instance, apps). Avec des slugs : ces apps seulement (--instance pour la config aussi).
+# Ordre : config d'instance (.env, proxy/Caddyfile, proxy/domains), certificats (--certs), puis chaque app :
+# arrêtée, ses data/ et .env remplacés, relancée. Ce qui est remplacé est mis de côté dans backups/pre-restore/<date>/
+# (jamais écrasé). Le code des apps vient de git : sur un serveur neuf, installe l'instance et fais `git pull` d'abord.
+STACKFAST_ALLOW_NO_ENV=1
+export STACKFAST_ALLOW_NO_ENV
+
+usage() { sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-1}"; }
+A="${1:-}"
+case "$A" in ""|-h|--help) usage 0 ;; esac
+case "$A" in /*) ;; *) A="$PWD/$A" ;; esac
+shift
+
+. "$(dirname "$0")/lib.sh"
+
+[ -f "$A" ] || die "archive introuvable : $A"
+list=0; noinst=0; withinst=0; certs=0; want=""
+for a in "$@"; do
+  case "$a" in
+    --list) list=1 ;;
+    --instance) withinst=1 ;;
+    --no-instance) noinst=1 ;;
+    --certs) certs=1 ;;
+    -*) usage ;;
+    *) want="$want $a" ;;
+  esac
+done
+
+tmp="$(mktemp -d "$ROOT/.restore.XXXXXX")"
+trap 'rm -rf "$tmp"' EXIT
+chmod 700 "$tmp"
+cat_archive "$A" | tar -xzf - -C "$tmp" || die "archive illisible (mauvaise phrase de passe ?) : $A"
+[ -f "$tmp/manifest" ] || die "pas une sauvegarde stackfast (manifest absent) : $A"
+
+if [ "$list" = 1 ]; then
+  cat "$tmp/manifest"
+  echo
+  for appd in "$tmp"/apps/*/*; do
+    [ -d "$appd" ] || continue
+    printf '  %-18s data %-8s %s\n' "$(basename "$appd")" "$(du -sh "$appd/data" | cut -f1)" \
+      "$([ -f "$appd/.env" ] && echo '.env')"
+  done
+  [ -d "$tmp/instance" ] && { echo "  instance :"; ( cd "$tmp/instance" && find . -type f | sed 's#^\./#    #' ); }
+  [ -f "$tmp/certs.tar" ] && echo "  certificats : oui (--certs pour les restaurer)"
+  exit 0
+fi
+
+ts="$(date +%Y%m%d-%H%M%S)"
+keep="${BACKUP_DIR:-backups}/pre-restore/$ts"
+mkdir -p "$keep"
+chmod -R go-rwx "${BACKUP_DIR:-backups}" 2>/dev/null || true
+
+# 1. Config d'instance : restauration complète, ou à la demande (--instance) quand on ne restaure que quelques apps.
+[ -z "$want" ] && [ "$noinst" != 1 ] && withinst=1
+if [ "$withinst" = 1 ] && [ "$noinst" != 1 ] && [ -d "$tmp/instance" ]; then
+  envchanged=0
+  if [ ! -f .env ] || ! cmp -s .env "$tmp/instance/.env"; then envchanged=1; fi
+  ( cd "$tmp/instance" && find . -type f ) | while read -r f; do
+    f="${f#./}"
+    if [ -f "$f" ] && ! cmp -s "$f" "$tmp/instance/$f"; then
+      mkdir -p "$keep/instance/$(dirname "$f")"
+      mv "$f" "$keep/instance/$f"
+    fi
+    if [ ! -f "$f" ]; then
+      mkdir -p "$(dirname "$f")"
+      cp -p "$tmp/instance/$f" "$f"
+      say instance "$f restauré"
+    fi
+  done
+  if [ -f .env ]; then
+    set -a
+    . ./.env
+    set +a
+    INSTANCE="${STACKFAST_INSTANCE:-main}"
+    PROXY="$INSTANCE-proxy"
+  fi
+  [ "$envchanged" = 1 ] && say attention "vérifie HOST_UID/HOST_GID dans .env (id -u, id -g) : ils viennent de l'ancien serveur"
+fi
+[ -f .env ] || die ".env d'instance absent : restaure l'instance (sans --no-instance) ou copie .env.example"
+
+# 2. Certificats du proxy (avant de démarrer le proxy, donc avant les apps).
+if [ "$certs" = 1 ]; then
+  [ -f "$tmp/certs.tar" ] || die "pas de certificats dans cette sauvegarde"
+  docker compose --env-file .env -f proxy/compose.yml down >/dev/null 2>&1 || true
+  docker compose --env-file .env -f proxy/compose.yml up --no-start >/dev/null 2>&1
+  docker run --rm -v "$INSTANCE-proxy_data:/data" -v "$tmp:/in:ro" --entrypoint sh caddy:2 \
+    -c 'find /data -mindepth 1 -delete; tar -xf /in/certs.tar -C /data'
+  say certificats "restaurés"
+fi
+
+# 3. Apps.
+nrest=0
+for appd in "$tmp"/apps/*/*; do
+  [ -d "$appd" ] || continue
+  slug="$(basename "$appd")"; stack="$(basename "$(dirname "$appd")")"
+  if [ -n "$want" ] && ! echo " $want " | grep -q " $slug "; then continue; fi
+  dest="apps/$stack/$slug"
+  if [ ! -d "$dest" ]; then
+    say ignorée "$dest absent : le code vient de git (stackfast pull / git clone), puis relance restore"
+    continue
+  fi
+  [ -f "$dest/compose.yml" ] && compose_app "$slug" down >/dev/null 2>&1 || true
+  mkdir -p "$keep/$slug"
+  [ -d "$dest/data" ] && mv "$dest/data" "$keep/$slug/data"
+  for f in .env .env.agent; do
+    if [ -f "$dest/$f" ]; then mv "$dest/$f" "$keep/$slug/$f"; fi
+  done
+  cp -a "$appd/data" "$dest/data"
+  for f in .env .env.agent; do
+    if [ -f "$appd/$f" ]; then cp -p "$appd/$f" "$dest/$f"; fi
+  done
+  [ -f "$dest/.env" ] && chmod 600 "$dest/.env"
+  if [ -f "$dest/compose.yml" ]; then "$ROOT/bin/up" "$slug" || say attention "$slug : démarrage en échec (stackfast logs $slug)"; fi
+  say restaurée "$slug (data/ et .env ; l'ancien état est dans $keep/$slug)"
+  nrest=$((nrest + 1))
+done
+[ "$nrest" -gt 0 ] || [ "$certs" = 1 ] || [ "$withinst" = 1 ] || say attention "rien restauré (slugs demandés absents de l'archive ?)"
+
+find "$keep" -depth -type d -empty -delete 2>/dev/null || true
+echo
+say terminé "vérifie : stackfast ls && stackfast audit"

@@ -25,6 +25,8 @@ stackfast ls                                    # apps, santé, adresses
 stackfast audit                                 # PHP servi vs dernier correctif, apps à jour
 stackfast update                                # faille PHP publiée : reconstruit, teste toutes les apps, bascule
 stackfast deploy                                # sur le VPS après un push : git pull + tout à jour
+stackfast backup                                # data/ + .env de chaque app, config d'instance, certificats (chiffrable)
+stackfast restore <archive> [<slug>]            # une app, ou tout (serveur neuf : --certs)
 ```
 
 Aussi : `up`, `down`, `logs`, `shell`, `rollback`, `proxy`, `migrate`. `stackfast` sans argument les liste.
@@ -89,4 +91,5 @@ docs/TUTORIEL.md         tout comprendre, de bout en bout
 docs/DEPLOY-VPS.md       déployer en prod, migrer une instance de l'ancien modèle
 docs/SECURITE.md         une faille PHP est annoncée : update + audit
 docs/AGENTS-ISOLES.md    plusieurs agents sur une app : sandbox, preview, fusion
+docs/SAUVEGARDE.md       sauvegarder, restaurer, repartir d'un serveur détruit
 ```
