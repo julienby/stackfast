@@ -45,7 +45,7 @@ done
 
 napps=0
 for slug in $targets; do
-  d="$(app_dir "$slug")"; stack="$(basename "$(dirname "$d")")"; out="$stage/apps/$stack/$slug"
+  d="$(app_dir "$slug")"; out="$stage/apps/$slug"
   mkdir -p "$out/data"
   for f in .env .env.agent; do
     if [ -f "$d/$f" ]; then cp -p "$d/$f" "$out/$f"; fi

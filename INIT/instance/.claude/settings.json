@@ -1,7 +1,5 @@
 {
-  "hooks": {
-    "Stop": [
-      { "hooks": [ { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/verify.sh" } ] }
-    ]
+  "permissions": {
+    "deny": ["Read(apps/*/.env)", "Read(apps/*/data/**)", "Read(backups/**)"]
   }
 }

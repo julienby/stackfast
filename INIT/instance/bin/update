@@ -1,81 +1,45 @@
 #!/usr/bin/env sh
-# Met à jour la stack (image reconstruite avec le dernier correctif PHP) et bascule ses apps, ou le proxy.
-#   bin/update                 toutes les stacks utilisées + le proxy
-#   bin/update <stack>         une stack
-#   bin/update proxy           l'image Caddy du proxy
-#   bin/update --build-only <stack>   construit seulement (appelé par bin/up quand l'image manque ou a changé)
-# Faille PHP publiée → `stackfast update`, puis `stackfast audit` : c'est toute la procédure.
-# Ordre sûr : construire :next → tester toutes les apps avec :next → :current devient :previous → :next devient
-# :current → recréer les apps. Un test rouge arrête tout avant la bascule ; `stackfast rollback <stack>` revient.
+# Correctifs de sécurité (PHP, Caddy) : reconstruit l'image de chaque app avec la dernière image de base, sans toucher
+# à son code, la teste, puis la bascule. Et l'image du proxy.
+#   bin/update            toutes les apps + le proxy
+#   bin/update <slug>…    ces apps
+#   bin/update proxy      le proxy seul
+# Ordre sûr par app : l'image en service devient :previous, on construit (--pull), on lance bin/check ;
+# rouge → on remet :previous, l'app n'a jamais été coupée ; vert → on recrée le conteneur. `stackfast rollback <slug>` revient.
 . "$(dirname "$0")/lib.sh"
 
-build_only=0
-[ "${1:-}" = --build-only ] && { build_only=1; shift; }
-
-build() {
-  img="$(image "$1")"
-  echo "== construction $img (base $(stack_conf "$1" BASE_IMAGE), --pull)"
-  docker build --pull --target app \
-    --build-arg "BASE_IMAGE=$(stack_conf "$1" BASE_IMAGE)" \
-    --label "stackfast.context=$(context_hash "$1")" \
-    -t "$img:next" "stacks/$1"
-}
-
-# Image de sandbox des agents (cible `agent` du Dockerfile) : même base PHP, donc mêmes correctifs.
-build_agent() {
-  echo "== construction $(image "$1")-agent (sandbox des agents)"
-  docker build --pull --target agent \
-    --build-arg "BASE_IMAGE=$(stack_conf "$1" BASE_IMAGE)" \
-    --label "stackfast.context=$(context_hash "$1")" \
-    -t "$(image "$1")-agent:current" "stacks/$1"
-}
-
-promote() {
-  img="$(image "$1")"
+update_app() {
+  slug="$1"; img="$(app_image "$slug")"
+  echo "== $slug"
   docker image inspect "$img:current" >/dev/null 2>&1 && docker tag "$img:current" "$img:previous"
-  docker tag "$img:next" "$img:current"
-  docker tag "$img:next" "$img:$(date +%Y%m%d-%H%M)"
-  docker rmi "$img:next" >/dev/null
-}
-
-update_stack() {
-  stack="$1"
-  build "$stack"
-  if [ -n "$(apps "$stack")" ]; then
-    echo "== tests de toutes les apps $stack avec la nouvelle image"
-    IMAGE="$(image "$stack"):next" "$ROOT/bin/check" "$stack" \
-      || { docker rmi "$(image "$stack"):next" >/dev/null; die "tests rouges : rien n'a changé, les apps tournent toujours sur l'ancienne image"; }
+  if ! compose_app "$slug" build --pull >/dev/null 2>&1; then
+    docker image inspect "$img:previous" >/dev/null 2>&1 && docker tag "$img:previous" "$img:current"
+    echo "  construction échouée : rien n'a changé (compose build --pull dans $(app_dir "$slug") pour voir)" >&2; return 1
   fi
-  promote "$stack"
-  [ -f "stacks/$stack/agent-setup" ] && build_agent "$stack"
-  apps "$stack" | while read -r s slug; do
-    compose_app "$slug" up -d --force-recreate --wait --wait-timeout 60 \
-      || echo "ATTENTION : $slug n'est pas saine après la bascule → stackfast logs $slug, ou stackfast rollback $stack" >&2
-    say basculée "$slug"
-  done
+  if ! ( cd "$(app_dir "$slug")" && bin/check >/dev/null 2>&1 ); then
+    docker image inspect "$img:previous" >/dev/null 2>&1 && docker tag "$img:previous" "$img:current"
+    echo "  tests rouges avec la nouvelle image : rien n'a changé, l'app tourne toujours sur l'ancienne" >&2; return 1
+  fi
+  compose_app "$slug" up -d --force-recreate --wait --wait-timeout 60 >/dev/null 2>&1 \
+    || { echo "  ATTENTION : $slug n'est pas saine après la bascule → stackfast logs $slug, ou stackfast rollback $slug" >&2; return 1; }
+  say basculée "$slug"
 }
 
 update_proxy() {
-  docker compose --env-file .env -f proxy/compose.yml pull
+  docker compose --env-file .env -f proxy/compose.yml pull -q
   docker compose --env-file .env -f proxy/compose.yml up -d
-  "$ROOT/bin/proxy"
+  "$ROOT/bin/proxy" >/dev/null
+  say proxy "image Caddy à jour"
 }
 
-if [ "$build_only" -eq 1 ]; then
-  stack="${1:?usage: bin/update --build-only <stack>}"
-  build "$stack"
-  promote "$stack"
-  exit 0
-fi
-
-if [ $# -eq 0 ]; then
-  set -- $(apps | cut -d' ' -f1 | sort -u) proxy
-fi
+[ $# -gt 0 ] || set -- $(apps | cut -d' ' -f2) proxy
+status=0
 for target in "$@"; do
   case "$target" in
-    proxy) update_proxy ;;
-    *)     update_stack "$target" ;;
+    proxy) update_proxy || status=1 ;;
+    *)     app_dir "$target" >/dev/null; update_app "$target" || status=1 ;;
   esac
 done
 echo
-exec "$ROOT/bin/audit"
+"$ROOT/bin/audit" || status=1
+exit "$status"

@@ -1,34 +1,16 @@
 #!/usr/bin/env sh
-# Dépendances composer d'UNE app (celles de toute la stack se déclarent dans le hub : stacks/<stack>/composer.json).
-#   bin/composer <slug> require vendor/paquet     ajoute une lib à cette app
-#   bin/composer <slug> remove vendor/paquet | update | install --no-dev | audit …
+# Dépendances composer d'une app (chaque app a les siennes, aucune n'est partagée).
+#   bin/composer <slug> require vendor/paquet     ajoute une lib
+#   bin/composer <slug> remove vendor/paquet | update | install | audit …
 # Composer tourne dans un conteneur jetable (rien à installer sur le serveur). vendor/ reste dans l'app, hors git ;
-# composer.json et composer.lock, eux, sont commités. `stackfast up` fait l'install tout seul après un git pull.
-# Une lib déjà fournie par la stack est refusée : deux versions du même paquet se marcheraient dessus.
+# composer.json et composer.lock sont commités dans le dépôt de l'app. `stackfast up` fait l'install tout seul.
 . "$(dirname "$0")/lib.sh"
 
 SLUG="${1:?usage: stackfast composer <slug> require vendor/paquet}"; shift
 [ $# -gt 0 ] || die "quelle commande composer ? (require, remove, update, install, audit…)"
-d="$(app_dir "$SLUG")"; stack="$(basename "$(dirname "$d")")"
-
-touch .gitignore
-grep -qxF 'apps/*/*/vendor/' .gitignore || echo 'apps/*/*/vendor/' >> .gitignore
-[ -f "$d/composer.json" ] || printf '{\n    "require": {}\n}\n' > "$d/composer.json"
+d="$(app_dir "$SLUG")"
 
 docker run --rm -u "$(id -u):$(id -g)" -e COMPOSER_HOME=/tmp/composer -v "$ROOT/$d:/app" -w /app composer:2 \
   composer "$@" --no-interaction --no-progress \
   || die "composer a échoué (voir ci-dessus)"
-
-# Garde-fou : aucun paquet commun entre la stack et l'app.
-names() { grep -E '^ {12}"name": "[^"]+/[^"]+",' "$1" | sed -E 's/.*"name": "([^"]+)".*/\1/' | sort -u; }
-if [ -f "$d/composer.lock" ] && [ -f "stacks/$stack/composer.lock" ]; then
-  names "stacks/$stack/composer.lock" > "$d/.dup.stack"
-  names "$d/composer.lock" > "$d/.dup.app"
-  dup="$(comm -12 "$d/.dup.stack" "$d/.dup.app")"
-  rm -f "$d/.dup.stack" "$d/.dup.app"
-  if [ -n "$dup" ]; then
-    echo "$dup" | sed 's/^/  /' >&2
-    die "ces paquets sont déjà fournis par la stack (deux versions risquent de se marcher dessus) : retire-les de l'app (stackfast composer $SLUG remove <paquet>) ou, s'ils servent à tout le monde, propose-les à la stack"
-  fi
-fi
-say composer "$SLUG : $(grep -cE '^ {12}"name": "[^"]+/[^"]+",' "$d/composer.lock" 2>/dev/null || echo 0) paquet(s) verrouillé(s)"
+say composer "$SLUG : $(grep -cE '^ {12}"name": "[^"]+/[^"]+",' "$d/composer.lock" 2>/dev/null || echo 0) paquet(s) verrouillé(s) ; pense à commiter composer.json et composer.lock"

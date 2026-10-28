@@ -39,7 +39,7 @@ cat_archive "$A" | tar -xzf - -C "$tmp" || die "archive illisible (mauvaise phra
 if [ "$list" = 1 ]; then
   cat "$tmp/manifest"
   echo
-  for appd in "$tmp"/apps/*/*; do
+  for appd in "$tmp"/apps/*; do
     [ -d "$appd" ] || continue
     printf '  %-18s data %-8s %s\n' "$(basename "$appd")" "$(du -sh "$appd/data" | cut -f1)" \
       "$([ -f "$appd/.env" ] && echo '.env')"
@@ -94,13 +94,13 @@ fi
 
 # 3. Apps.
 nrest=0
-for appd in "$tmp"/apps/*/*; do
+for appd in "$tmp"/apps/*; do
   [ -d "$appd" ] || continue
-  slug="$(basename "$appd")"; stack="$(basename "$(dirname "$appd")")"
+  slug="$(basename "$appd")"
   if [ -n "$want" ] && ! echo " $want " | grep -q " $slug "; then continue; fi
-  dest="apps/$stack/$slug"
+  dest="apps/$slug"
   if [ ! -d "$dest" ]; then
-    say ignorée "$dest absent : le code vient de git (stackfast pull / git clone), puis relance restore"
+    say ignorée "$dest absent : le code vient du dépôt de l'app (git clone <dépôt> apps/<slug>), puis relance restore"
     continue
   fi
   [ -f "$dest/compose.yml" ] && compose_app "$slug" down >/dev/null 2>&1 || true

@@ -1,11 +1,15 @@
 #!/usr/bin/env sh
-# Déploie l'instance : git pull, puis chaque app démarrée/mise à jour et le proxy régénéré.
-# Le code des apps est monté : un pull suffit pour lui. Une stack modifiée (Dockerfile, php.ini…) est
-# reconstruite automatiquement par bin/up. Pour un correctif PHP sans changement du repo : stackfast update.
-#   bin/deploy
+# Déploie : met à jour le code de chaque app depuis son dépôt (si elle a un remote), puis up --all.
+# Le code est monté : un pull suffit pour lui ; bin/build et l'image suivent si besoin.
+#   bin/deploy            toutes les apps
+#   bin/deploy <slug>…    ces apps
 . "$(dirname "$0")/lib.sh"
 
-if [ -n "$(git config --get remote.origin.url 2>/dev/null)" ]; then
-  git pull --ff-only
-fi
-exec "$ROOT/bin/up" --all
+[ $# -gt 0 ] || set -- $(apps | cut -d' ' -f2)
+for slug in "$@"; do
+  d="$(app_dir "$slug")"
+  if [ -n "$(git -C "$d" config --get remote.origin.url 2>/dev/null)" ]; then
+    git -C "$d" pull --ff-only -q && say code "$slug à jour ($(git -C "$d" rev-parse --short HEAD))"
+  fi
+done
+exec "$ROOT/bin/up" "$@"

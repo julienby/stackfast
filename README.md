@@ -1,95 +1,79 @@
 # stackfast
 
-Ma façon de coder avec une IA, et les stacks qui vont avec. Ce repo est le **hub** : il ne contient aucune app.
+Ma façon de coder avec une IA, et les recettes d'apps qui vont avec. Ce repo est le **hub** : il ne contient aucune app.
+Pour comprendre l'ensemble en une page : [ARCHITECTURE.md](ARCHITECTURE.md).
 
-## Quatre niveaux
+## Le principe
 
-| Niveau | Où | Contient | Qui l'écrit |
-|---|---|---|---|
-| **Méthode** | `~/.claude/CLAUDE.md` (Codex : `~/.codex/AGENTS.md`) | comment je travaille, Lessons globales | le hub (`INIT/CLAUDE.global.md`) |
-| **Instance** | un repo par VPS | `AGENTS.md`, `bin/`, `proxy/` (Caddy), `.env`, `apps/` | gabarit du hub, puis le VPS |
-| **Stack** | `stacks/<stack>/` dans l'instance | image, base du conteneur, helpers partagés, `AGENTS.md` de la stack, `app-template/` | **le hub uniquement**, resynchronisé par `stackfast sync` |
-| **App** | `apps/<stack>/<slug>/` | `PRD.md`, `AGENTS.md`, `compose.yml`, `.env`, `index.php`, `routes.php`, `models/`, `controllers/`, `views/`, `data/`, `tests/` | l'app |
+**Une app = une cuisine autonome** : son dépôt git, son image, son socle, ses libs, sa base SQLite, son contrat pour Claude. Elle se construit, se teste et tourne seule. **Seul le Caddy du serveur est partagé** (TLS, domaines, une route par app).
 
-**Un conteneur par app**, tous construits sur l'image de leur stack, un seul Caddy devant. Une app naît sur `https://apps.domaine.fr/<slug>/`, puis passe à `<slug>.domaine.fr`, puis à son propre domaine : une commande à chaque fois, zéro changement de code, les anciennes adresses redirigent.
+stackfast n'est pas une dépendance d'exécution. Il a trois rôles :
+- **générateur** : les recettes (`php-htmx`), copiées dans l'app à sa création, avec leur version ;
+- **boîte à outils** : les mêmes modes opératoires pour toutes les apps (`check`, `update`, `audit`, `backup`…) ;
+- **mémoire** : la méthode, les leçons, les skills, partagées en direct entre les apps.
 
-## Parler à l'instance
+Le code est copié et versionné ; le savoir-faire est partagé.
+
+## Parler au serveur
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/julienby/stackfast/main/INIT/install.sh | sh -s -- mon-vps
-cd mon-vps && cp .env.example .env              # APPS_HOST, HOST_UID
-stackfast new php-htmx demo                     # gabarit + token + conteneur + proxy → https://apps.domaine.fr/demo/
-stackfast check demo                            # lint + tests dans l'image ; un hook le relance à chaque fin de tour de Claude
-stackfast domain demo demo.domaine.fr           # l'app est mûre : nouvelle adresse, l'ancienne redirige
+curl -fsSL https://raw.githubusercontent.com/julienby/stackfast/main/INIT/install.sh | sh -s -- ~/srv
+cd ~/srv && cp .env.example .env                # APPS_HOST, HOST_UID
+stackfast new php-htmx monsite                  # une app autonome dans apps/monsite (son dépôt git) → https://apps.domaine.fr/monsite/
+cd apps/monsite && claude                       # Claude ne voit que l'app ; /prd, /feature, /retro
+stackfast check monsite                         # lint, tests, marqueurs de conflit (le bin/check de l'app)
+stackfast domain monsite monsite.fr             # nouvelle adresse, l'ancienne redirige
 stackfast ls                                    # apps, santé, adresses
-stackfast audit                                 # PHP servi vs dernier correctif, apps à jour
-stackfast update                                # faille PHP publiée : reconstruit, teste toutes les apps, bascule
-stackfast deploy                                # sur le VPS après un push : git pull + tout à jour
-stackfast backup                                # data/ + .env de chaque app, config d'instance, certificats (chiffrable)
-stackfast restore <archive> [<slug>]            # une app, ou tout (serveur neuf : --certs)
+stackfast audit                                 # PHP servi vs dernier correctif, failles composer, sauvegardes
+stackfast update                                # faille PHP ou Caddy : reconstruit chaque image, teste, bascule (code inchangé)
+stackfast composer monsite require vendor/pkg   # une lib pour cette app seulement
+stackfast backup                                # data/ + .env de chaque app, config du serveur, certificats (chiffrable)
+stackfast deploy                                # git pull de chaque app, puis tout à jour
 ```
 
-Aussi : `up`, `down`, `logs`, `shell`, `rollback`, `proxy`, `migrate`. `stackfast` sans argument les liste.
+Aussi : `up`, `down`, `logs`, `shell`, `rollback`, `restore`, `proxy`. `stackfast` sans argument les liste.
 
-## Des agents sur une app, isolés
+## La recette php-htmx
 
-```sh
-stackfast agent new demo a1 a2 a3               # 3 sandboxes : copie de l'app, conteneur, réseau, preview protégée
-stackfast agent run demo a1 "ajoute un export CSV"   # Claude Code en autonomie
-stackfast agent diff demo a1 && stackfast agent apply demo a1   # tu relis, puis fusion à 3 voies
-```
+PHP 8.5 sur **FrankenPHP en mode worker** (rechargé à chaud quand un fichier change), **SQLite** (WAL, migrations numérotées), **htmx** et **Tailwind compilé** servis par l'app (aucun CDN), composer pour les libs classiques. MVC en fonctions, sans framework ni classe : `routes.php`, `models/`, `controllers/`, `views/`, `core/`. CSRF sans session, conteneur durci (lecture seule, non root, aucune capability), `/api` et `/mcp` par défaut. Une équipe de sous-agents Claude (commis Sonnet, sous-traitant Haiku, relecteur Opus).
 
-Un agent ne voit que son app : ni les autres apps, ni les secrets, ni docker. Voir [docs/AGENTS-ISOLES.md](docs/AGENTS-ISOLES.md).
-
-Dans Claude Code : `/new-app`, `/feature`, `/retro`.
+Mesuré sur 1 CPU : environ 3 400 pages d'accueil par seconde (SQLite compris), p99 sous 30 ms, ~45 Mo de RAM par app. Le contrat complet est dans `INIT/stacks/php-htmx/template/AGENTS.md`.
 
 ## Client `stackfast`
 
-`install.sh` clone le hub dans `~/.stackfast` et pose `~/.local/bin/stackfast`. Il le relie ensuite :
-`~/.claude/CLAUDE.md` et `~/.codex/AGENTS.md` pointent vers `INIT/CLAUDE.global.md`, chaque skill de `INIT/skills/` vers `~/.claude/skills/<skill>`,
-`~/.codex/rapide.config.toml` et `~/.codex/fort.config.toml` vers `INIT/codex/` (profils Codex, effort seulement).
-Un fichier déjà présent est sauvegardé en `.bak.<date>`, jamais écrasé.
+`install.sh` clone le hub dans `~/.stackfast` et pose `~/.local/bin/stackfast`. Il relie aussi `~/.claude/CLAUDE.md` et `~/.codex/AGENTS.md` à `INIT/CLAUDE.global.md`, et chaque skill de `INIT/skills/`. Un fichier déjà présent est sauvegardé en `.bak.<date>`.
 
 ```sh
 stackfast status                  # changements locaux + écart avec GitHub
-stackfast pull                    # récupère le hub, refait les liens (VPS : seulement ça)
-stackfast push "message"          # commit + pull --rebase + push de ce que j'ai modifié en local
-stackfast skill add ~/.claude/skills/ma-skill   # la skill passe dans le hub
-stackfast init mon-vps            # crée une instance ; stackfast sync la met à jour
-stackfast sync [--force]          # recopie bin/, .claude/ et les stacks ; s'arrête si l'un d'eux a été modifié localement
+stackfast pull                    # récupère le hub, refait les liens
+stackfast push "message"          # commit + pull --rebase + push de ce que j'ai modifié dans le hub
+stackfast skill add ~/.claude/skills/ma-skill
+stackfast init ~/srv              # crée une instance (dossier serveur) ; stackfast sync met ses outils à jour
 ```
-
-Modifier `~/.claude/CLAUDE.md`, c'est modifier le clone : `stackfast push` le remonte, `stackfast pull` le redescend ailleurs.
 
 ## Capitalisation
 
-- une erreur sur **une app** → `apps/<stack>/<slug>/AGENTS.md` ;
-- la même sur **deux apps** → `INIT/stacks/<stack>/AGENTS.md` dans ce hub, `stackfast push`, puis `stackfast pull && stackfast sync` sur chaque VPS ;
-- sur **deux stacks** → `~/.claude/CLAUDE.md` (lien vers `INIT/CLAUDE.global.md`), puis `stackfast push`.
+- une erreur sur **une app** → « Leçons de l'app » dans son `AGENTS.md` ;
+- valable pour **toutes les apps d'une recette** → `INIT/stacks/<recette>/template/AGENTS.md` dans ce hub (les prochaines apps l'ont ; les existantes via `upgrade`, phase 4) ;
+- valable **partout** → `~/.claude/CLAUDE.md` (lien vers `INIT/CLAUDE.global.md`), effet immédiat.
 
 `/retro` propose la ligne et son niveau ; rien n'est écrit sans accord.
 
-## Stacks
+## Où en est la construction
 
-- `php-htmx` : PHP 8.5 sur FrankenPHP (un conteneur durci par app), htmx 4 + Tailwind CDN, JSON à plat puis SQLite, tests CLI. Chaque app expose aussi `/api` et `/mcp` par défaut (bearer token `<SLUG>_API_TOKEN`). Voir `INIT/stacks/php-htmx/AGENTS.md`.
-- `python` : à venir, même moule.
+Phase 1 (recette autonome, outils serveur) : faite et testée sur Docker. Suite : déploiement sans coupure (2), modules (3), leçons et `upgrade`, agents en `git worktree` (4), migration des anciens projets (5). Voir [ARCHITECTURE.md](ARCHITECTURE.md).
+
+**Docs pas encore à jour** avec les apps autonomes : `docs/TUTORIEL.md`, `docs/tutoriel-visuel.html`, `docs/GETTING-STARTED.md`, `docs/DEPLOY-VPS.md` (elles décrivent l'image partagée par stack et `apps/<stack>/<slug>`). `stackfast agent` est en refonte (phase 4).
 
 ## Repo
 
 ```
-INIT/install.sh          installeur idempotent du client (curl | sh)
-INIT/stackfast           le client : liens global + skills, pull/push, init/sync d'instance
-INIT/skills/<skill>/     mes skills, reliées dans ~/.claude/skills/ (`explain` : page HTML dans ~/.cache/explain/)
-INIT/codex/              profils Codex rapide/fort, reliés dans ~/.codex/
-INIT/CLAUDE.global.md    la méthode
-INIT/instance/           gabarit d'un VPS (copié sans écraser ; bin/ et .claude/ resynchronisés par sync)
-INIT/stacks/<stack>/     une stack (copiée en écrasant, sauf modification locale détectée)
+ARCHITECTURE.md          la cible en une page
 DECISIONS.md             arbitrages du hub
-docs/PRD.md              le pourquoi de cette organisation
-docs/GETTING-STARTED.md  tester en local, sans VPS ni domaine
-docs/TUTORIEL.md         tout comprendre, de bout en bout
-docs/DEPLOY-VPS.md       déployer en prod, migrer une instance de l'ancien modèle
-docs/SECURITE.md         une faille PHP est annoncée : update + audit
-docs/AGENTS-ISOLES.md    plusieurs agents sur une app : sandbox, preview, fusion
-docs/SAUVEGARDE.md       sauvegarder, restaurer, repartir d'un serveur détruit
+INIT/install.sh          installeur idempotent du client (curl | sh)
+INIT/stackfast           le client : liens, pull/push, init/sync, et les verbes du serveur
+INIT/instance/           gabarit du dossier serveur : bin/ (les outils), proxy/ (Caddy), .claude/
+INIT/stacks/<recette>/   une recette : stack.json (version) et template/ (l'app autonome copiée par stackfast new)
+INIT/skills/  INIT/codex/  INIT/CLAUDE.global.md   la méthode et les outils de travail
+docs/                    SECURITE, SAUVEGARDE, AGENTS-ISOLES, DEPLOY-VPS, tutoriels
 ```

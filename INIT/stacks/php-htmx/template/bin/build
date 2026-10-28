@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+# Prépare l'app pour le développement (code monté dans le conteneur) : dépendances composer, puis CSS Tailwind.
+# Depuis l'hôte, dans le dossier de l'app ; Docker suffit (composer et Tailwind tournent dans des conteneurs jetables).
+# `stackfast up` le lance pour toi. En production, le Dockerfile fait la même chose dans l'image.
+set -eu
+cd "$(dirname "$0")/.."
+uid="$(id -u):$(id -g)"
+
+docker run --rm -u "$uid" -e COMPOSER_HOME=/tmp/composer -v "$PWD:/app" -w /app composer:2 \
+  composer install --no-interaction --no-progress --quiet
+
+# L'étape « assets » du Dockerfile contient le binaire Tailwind (vérifié par son empreinte) ; on la réutilise.
+docker build -q --target assets -t "sf-tailwind:4.3.3" . >/dev/null
+docker run --rm -u "$uid" -v "$PWD:/app" -w /app sf-tailwind:4.3.3 \
+  tailwindcss -i assets/src/app.css -o assets/app.css --minify 2>&1 | grep -v '^≈\|^$' || true
+echo "build : vendor/ et assets/app.css à jour"

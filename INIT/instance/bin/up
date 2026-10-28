@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
-# Démarre (ou met à jour la config de) une app, ou toutes : bin/up <slug>… | bin/up --all
-# Construit l'image de la stack si elle manque ou si la stack a changé, attend que l'app soit saine,
-# puis met le proxy à jour. Le code est monté : le modifier ne demande pas de `up`.
+# Démarre (ou met à jour) une app, ou toutes : bin/up <slug>… | bin/up --all
+# Lance ce que l'app sait faire : bin/build (dépendances, CSS), puis son compose (image construite si besoin),
+# attend qu'elle soit saine, puis met le proxy à jour. Le code est monté : le modifier ne demande pas de `up`.
 . "$(dirname "$0")/lib.sh"
 
 [ $# -gt 0 ] || die "usage : stackfast up <slug>… | stackfast up --all"
@@ -11,15 +11,10 @@ if [ "$1" = --all ]; then
 fi
 
 for slug in "$@"; do
-  stack="$(app_stack "$slug")"
-  image_stale "$stack" && "$ROOT/bin/update" --build-only "$stack"
-  [ -f "$(app_dir "$slug")/.env" ] || die "$(app_dir "$slug")/.env manquant"
-  # Dépendances composer propres à l'app : installées si vendor/ manque ou si composer.lock est plus récent (après un git pull).
   d="$(app_dir "$slug")"
-  if [ -f "$d/composer.lock" ] && { [ ! -f "$d/vendor/autoload.php" ] || [ "$d/composer.lock" -nt "$d/vendor/autoload.php" ]; }; then
-    "$ROOT/bin/composer" "$slug" install --no-dev
-  fi
-  compose_app "$slug" up -d --remove-orphans --wait --wait-timeout 60 \
+  [ -f "$d/.env" ] || die "$d/.env manquant (stackfast restore, ou recrée APP_SECRET et API_TOKEN)"
+  [ -x "$d/bin/build" ] && ( cd "$d" && bin/build >/dev/null ) || die "$slug : bin/build a échoué (lance-le dans $d pour voir)"
+  compose_app "$slug" up -d --build --remove-orphans --wait --wait-timeout 60 \
     || die "$slug ne démarre pas sainement : stackfast logs $slug"
   say en\ ligne "$slug → $(app_url "$slug")"
 done

@@ -1,5 +1,7 @@
 # Déployer sur un VPS
 
+> **À mettre à jour.** Ce document décrit l'ancien modèle (image partagée par stack, `apps/<stack>/<slug>`). Les apps sont désormais autonomes : voir [ARCHITECTURE.md](../ARCHITECTURE.md) et le `AGENTS.md` de la recette.
+
 Une instance = un repo sur le VPS. Elle porte son propre Caddy (`proxy/`, ports 80/443) et un conteneur par app.
 Prérequis : Docker + `docker compose` v2.17 ou plus, `git`, `curl`, `openssl`, ports 80/443 libres.
 

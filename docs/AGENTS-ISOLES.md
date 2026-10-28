@@ -1,5 +1,7 @@
 # Agents isolés : plusieurs agents sur une app, sans qu'ils voient le reste
 
+> **En refonte (phase 4).** Avec les apps autonomes, un agent travaillera dans un `git worktree` de l'app, dans un conteneur qui ne monte que lui. `stackfast agent` est désactivé d'ici là : `cd apps/<slug> && claude`. Ce document décrit l'ancienne version.
+
 `stackfast agent` lance des agents (Claude Code) sur **une** app. Chacun travaille dans sa sandbox : sa copie de l'app, son conteneur, son réseau, sa preview. Les autres apps, les secrets de l'instance et docker lui sont invisibles. Ce qu'il produit revient dans l'instance par une fusion que tu relis.
 
 ## Trois agents sur une app

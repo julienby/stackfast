@@ -1,5 +1,0 @@
-#!/usr/bin/env sh
-# Prépare la copie de travail d'un agent (appelé par bin/agent) : $1 = dossier de travail, miroir de l'instance.
-# Le vendor/ composer vit dans l'image (/stacks/php-htmx/vendor) : un lien suffit, valide dans le conteneur.
-set -eu
-ln -sfn /stacks/php-htmx/vendor "$1/stacks/php-htmx/vendor"

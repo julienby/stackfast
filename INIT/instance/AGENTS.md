@@ -1,32 +1,29 @@
-# Instance — contrat du VPS
+# Instance — contrat du serveur
 
-> Un VPS = ce repo. Plusieurs stacks (`stacks/`), plusieurs apps (`apps/<stack>/<slug>/`), **un conteneur par app**, un Caddy devant (`proxy/`).
-> Trois niveaux de règles, lus dans cet ordre : `~/.claude/CLAUDE.md` (méthode) → `stacks/<stack>/AGENTS.md` (stack) → `apps/<stack>/<slug>/AGENTS.md` (app).
-> `CLAUDE.md` est un lien vers ce fichier : un contrat, tous les clients.
-> On parle à l'instance par `stackfast <commande>` (= `bin/<commande>`), jamais par `docker` à la main.
+> Une instance = le dossier serveur : le Caddy partagé (`proxy/`), les outils (`bin/`, appelés par `stackfast <verbe>`), et `apps/` où chaque app est **un dépôt git autonome**.
+> Ici, on exploite le serveur. **On ne code pas une app depuis ici** : `cd apps/<slug> && claude`, où Claude ne voit que l'app et suit son propre `AGENTS.md`.
+> `CLAUDE.md` est un lien vers ce fichier. Architecture : `ARCHITECTURE.md` du hub (`~/.stackfast`).
 
 ## Si tu dois…
 
-- **créer une app** → `stackfast new <stack> <slug>` : gabarit, `.env` et token, conteneur démarré, en ligne sur `https://$APPS_HOST/<slug>/`. Puis lis son `PRD.md` et suis « Première session » de son `AGENTS.md`. Ne crée jamais une app à la main.
-- **travailler sur une app** → lis d'abord `stacks/<stack>/AGENTS.md`, puis l'`AGENTS.md` et le `PRD.md` de l'app. Ne lis pas les autres apps ni leur `.env`.
-- **vérifier** → `stackfast check [slug]`. Cite la sortie. Un hook la relance à chaque fin de tour sur les apps touchées.
-- **voir l'état** → `stackfast ls` (apps, santé, adresses) ; `stackfast logs <slug>` (erreurs PHP comprises).
-- **donner une adresse à une app** → `stackfast domain <slug> <domaine>` : le domaine devient l'adresse, l'ancien chemin et les anciens domaines redirigent (301). Zéro changement de code. Ne modifie pas `proxy/generated.caddy`.
-- **appliquer un correctif de sécurité** (PHP, Caddy) → `stackfast update` puis `stackfast audit`. Voir `docs/SECURITE.md` du hub.
-- **faire travailler des agents sur une app** → `stackfast agent new <slug> a1 a2…` puis `agent run` ou `agent shell`, `agent diff`, `agent apply`. Chaque agent est isolé (sa copie, son conteneur, sa preview). Relis le diff avant `apply`, puis `stackfast check <slug>`. Voir `docs/AGENTS-ISOLES.md` du hub. Un agent ne lit jamais d'autre app ni de `.env` ; toi non plus quand tu travailles dans sa sandbox.
-- **sauvegarder / restaurer** → `stackfast backup` (data/ et .env de chaque app, config d'instance, certificats), `stackfast restore <archive> [slug]`. Avant toute opération risquée (migration, suppression, restauration). Voir `docs/SAUVEGARDE.md` du hub. Ne lis ni ne copie jamais le contenu d'une archive : elle contient les secrets.
-- **déployer** → `stackfast deploy` (git pull + toutes les apps + proxy).
-- **ajouter un secret** → `.env` de l'app (gitignoré), puis `stackfast up <slug>`. Le `.env` de l'instance ne contient que des réglages d'instance.
-- **ajouter un conteneur à une app** (base de données, worker…) → seulement si l'architecture l'impose : un service dans le `compose.yml` de l'app (modèle commenté), réseau `back`, une décision dans l'`AGENTS.md` de l'app.
-- **prendre une décision d'architecture** → une ligne dans `DECISIONS.md`, après validation.
-- **placer une règle** → si elle reste vraie sur une autre stack, elle va dans la méthode (`~/.claude/CLAUDE.md`), sinon dans la stack. Le code propre à une stack vit dans `stacks/<stack>/` (`check`, `audit`, `post-new-app`, `stack.conf`), jamais dans `bin/`.
+- **créer une app** → `stackfast new <recette> <slug>` (aujourd'hui `php-htmx`). Puis `cd apps/<slug> && claude` et `/prd`.
+- **voir l'état** → `stackfast ls` ; `stackfast logs <slug>` ; `stackfast audit`.
+- **vérifier une app** → `stackfast check <slug>` (lance son `bin/check`).
+- **démarrer ou appliquer un changement de `.env` / `compose.yml`** → `stackfast up <slug>`.
+- **donner une adresse** → `stackfast domain <slug> <domaine>` (les anciennes adresses redirigent en 301). Ne modifie pas `proxy/generated.caddy`.
+- **corriger une faille PHP ou Caddy** → `stackfast update`, puis `stackfast audit`. Le code des apps n'est pas touché.
+- **déployer** → `stackfast deploy [slug]` (git pull de chaque app, puis up).
+- **sauvegarder / restaurer** → `stackfast backup`, `stackfast restore <archive> [slug]`.
+- **ajouter une lib à une app** → `stackfast composer <slug> require vendor/paquet`.
+- **prendre une décision d'architecture du serveur** → une ligne dans `DECISIONS.md`, après validation.
 
 ## Ne fais pas
 
-- Ne modifie pas `stacks/`, `bin/`, `.claude/` (sauf `settings.local.json`), `proxy/compose.yml` : ils appartiennent au hub `stackfast`. Une règle de stack se propose via `/retro`, s'écrit dans le hub, puis `stackfast pull && stackfast sync` est lancé ici.
-- Ne partage rien entre deux apps autrement que par la stack. Une app n'inclut pas les fichiers d'une autre, ne joint pas son conteneur.
-- Ne commite jamais `.env`, `data/`, `PLAN.md`, `proxy/generated.caddy`, `.agents/`, `backups/`.
+- Ne lis pas les `.env`, `data/` ni les archives de sauvegarde des apps : ils contiennent les secrets et les données (refusé par `.claude/settings.json`).
+- Ne modifie pas `bin/`, `.claude/`, `proxy/compose.yml` : ils viennent du hub (`stackfast pull && stackfast sync`).
+- Ne copie jamais du code d'une app dans une autre : une amélioration utile à toutes passe par la recette du hub, puis `stackfast upgrade` (phase 4).
+- Ne commite jamais `.env`, `proxy/generated.caddy`, `backups/`. `apps/` n'est pas suivi par ce dépôt.
 
-## Lessons de l'instance
+## Leçons de l'instance
 
-- _(vide)_ — règles propres à ce VPS uniquement (proxy, réseau, machine). Format : `- YYYY-MM-DD — règle. (erreur observée : ...)`.
+- _(vide)_ — règles propres à ce serveur (proxy, réseau, machine). Format : `- AAAA-MM-JJ — règle. (erreur observée : …)`.

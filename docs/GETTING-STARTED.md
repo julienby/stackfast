@@ -1,5 +1,7 @@
 # Getting started
 
+> **À mettre à jour.** Ce document décrit l'ancien modèle (image partagée par stack, `apps/<stack>/<slug>`). Les apps sont désormais autonomes : voir [ARCHITECTURE.md](../ARCHITECTURE.md) et le `AGENTS.md` de la recette.
+
 Deux parties :
 
 1. **Comprendre** : les subtilités, en exemples courts.

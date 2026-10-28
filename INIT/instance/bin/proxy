@@ -28,7 +28,7 @@ generate() {
     echo
     echo "$APPS_HOST {"
     apps | while read -r stack slug; do
-      upstream="$(app_container "$slug"):$(stack_conf "$stack" PORT)"
+      upstream="$(app_container "$slug"):$(app_port "$slug")"
       main="$(domains "$slug" | head -1)"
       if [ -n "$main" ]; then
         echo "	redir /$slug https://$main/ 301"
@@ -53,7 +53,7 @@ generate() {
         echo "			$puser $phash"
         echo "		}"
         echo "		header X-Robots-Tag noindex"
-        echo "		import stackfast_app $(agent_container "$slug" "$name"):$(stack_conf "$(agent_meta "$slug" "$name" stack)" PORT) /_preview/$slug/$name"
+        echo "		import stackfast_app $(agent_container "$slug" "$name"):8080 /_preview/$slug/$name"
         echo "	}"
       done
     fi
@@ -64,7 +64,7 @@ generate() {
   fi
 
   apps | while read -r stack slug; do
-    upstream="$(app_container "$slug"):$(stack_conf "$stack" PORT)"
+    upstream="$(app_container "$slug"):$(app_port "$slug")"
     main=""
     for d in $(domains "$slug"); do
       echo

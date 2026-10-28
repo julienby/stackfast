@@ -1,36 +1,48 @@
 #!/usr/bin/env sh
-# Crée une app et la met en ligne : bin/new <stack> <slug>
-# Copie stacks/<stack>/app-template, crée son .env, lance stacks/<stack>/post-new-app, démarre le conteneur,
-# l'ajoute au proxy et affiche son adresse.
+# Crée une app autonome et la met en ligne : bin/new <recette> <slug>
+# Copie la recette du hub (INIT/stacks/<recette>/template) dans apps/<slug>/, en fait un dépôt git à part,
+# génère son .env (secrets), note la version de la recette dans stackfast.json, puis la démarre et l'ajoute au proxy.
 . "$(dirname "$0")/lib.sh"
 
-STACK="${1:?usage: stackfast new <stack> <slug>}"
-SLUG="${2:?usage: stackfast new <stack> <slug>}"
-TEMPLATE="stacks/$STACK/app-template"
-DEST="apps/$STACK/$SLUG"
+STACK="${1:?usage: stackfast new <recette> <slug>}"
+SLUG="${2:?usage: stackfast new <recette> <slug>}"
+HUB="${STACKFAST_HOME:-$HOME/.stackfast}"
+RECIPE="$HUB/INIT/stacks/$STACK"
+DEST="apps/$SLUG"
 
 case "$SLUG" in
   *[!a-z0-9-]*|-*|"") die "slug invalide : [a-z0-9-], commence par une lettre ou un chiffre" ;;
 esac
-[ -d "$TEMPLATE" ] || die "stack inconnue : $STACK (stacks disponibles : $(ls stacks | tr '\n' ' '))"
-for d in apps/*/"$SLUG"; do
-  [ -e "$d" ] && die "slug déjà pris : $d"
-done
+[ -d "$RECIPE/template" ] || die "recette inconnue : $STACK (disponibles : $(ls "$HUB/INIT/stacks" | tr '\n' ' '))"
+[ ! -e "$DEST" ] || die "existe déjà : $DEST"
 
-mkdir -p "apps/$STACK"
-cp -R "$TEMPLATE" "$DEST"
-find "$DEST" -type f -exec sed -i "s/__SLUG__/$SLUG/g" {} +
-: > "$DEST/.env"
+mkdir -p apps
+cp -R "$RECIPE/template" "$DEST"
+version="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$RECIPE/stack.json")"
+commit="$(git -C "$HUB" rev-parse --short HEAD 2>/dev/null || echo inconnu)"
+find "$DEST" -type f -exec sed -i -e "s/__SLUG__/$SLUG/g" -e "s/__RECIPE__/$STACK@$version/g" -e "s/__RECIPE_COMMIT__/$commit/g" {} +
+{
+  echo "# Secrets de $SLUG (jamais commité). Après une modif : stackfast up $SLUG"
+  echo "APP_SECRET=$(openssl rand -hex 32)"
+  echo "API_TOKEN=$(openssl rand -hex 32)"
+} > "$DEST/.env"
 chmod 600 "$DEST/.env"
-say créée "$DEST"
-[ -x "stacks/$STACK/post-new-app" ] && "stacks/$STACK/post-new-app" "$SLUG" "$DEST"
+say créée "$DEST (recette $STACK@$version, hub $commit)"
+
+# Un dépôt git à part : Claude Code lancé dans l'app ne voit qu'elle.
+git -C "$DEST" init -q
+git -C "$DEST" add -A
+git -C "$DEST" -c user.name="${GIT_AUTHOR_NAME:-$(git config user.name || echo stackfast)}" \
+  -c user.email="${GIT_AUTHOR_EMAIL:-$(git config user.email || echo stackfast@localhost)}" \
+  commit -qm "Création depuis la recette $STACK@$version"
+say git "dépôt de l'app initialisé (ajoute un remote privé : git -C $DEST remote add origin …)"
 
 "$ROOT/bin/up" "$SLUG"
 
 cat <<EOF
 
 Ensuite :
-  - remplir $DEST/PRD.md (ou /new-app dans Claude Code) ;
-  - stackfast check $SLUG
-  - quand l'app est mûre : stackfast domain $SLUG $SLUG.<ton-domaine>
+  cd $DEST && claude          puis /prd pour remplir le produit
+  stackfast check $SLUG
+  quand l'app est mûre : stackfast domain $SLUG $SLUG.<ton-domaine>
 EOF

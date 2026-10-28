@@ -1,5 +1,7 @@
 # Tutoriel stackfast — tout comprendre
 
+> **À mettre à jour.** Ce document décrit l'ancien modèle (image partagée par stack, `apps/<stack>/<slug>`). Les apps sont désormais autonomes : voir [ARCHITECTURE.md](../ARCHITECTURE.md) et le `AGENTS.md` de la recette.
+
 Ce tutoriel explique **pourquoi** chaque pièce existe, puis **comment** s'en servir.
 Pour un test rapide, lis plutôt `GETTING-STARTED.md`.
 
