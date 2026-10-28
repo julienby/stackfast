@@ -1,0 +1,7 @@
+.git
+.env
+.claude
+data
+vendor
+assets/app.css
+PLAN.md

@@ -1,5 +1,7 @@
 # Tutoriel stackfast — tout comprendre
 
+> **À mettre à jour.** Ce document décrit l'ancien modèle (image partagée par stack, `apps/<stack>/<slug>`). Les apps sont désormais autonomes : voir [ARCHITECTURE.md](../ARCHITECTURE.md) et le `AGENTS.md` de la recette.
+
 Ce tutoriel explique **pourquoi** chaque pièce existe, puis **comment** s'en servir.
 Pour un test rapide, lis plutôt `GETTING-STARTED.md`.
 
@@ -183,41 +185,56 @@ Ensuite, une feature à la fois :
 
 ```
 apps/php-htmx/mon-app/
-├── PRD.md          ce que l'app doit faire (v1)
-├── AGENTS.md       règles propres à l'app + Lessons
-├── index.php       routage : une ligne par action
-├── lib/
-│   ├── items.php   métier : fonctions pures
-│   ├── api.php     endpoints REST (vide au départ)
-│   └── mcp.php     outils MCP (vide au départ)
-├── views/
-│   ├── layout.php  page complète
-│   ├── home.php
-│   └── partials/   fragments htmx
-├── compose.yml     son conteneur (base dans la stack)
-├── .env            ses secrets (gitignoré)
-├── data/           JSON + sessions (jamais servi)
-└── tests/          *_test.php, lancés par stackfast check
+├── PRD.md              ce que l'app doit faire (v1)
+├── AGENTS.md           règles propres à l'app + Lessons
+├── index.php           entrée : charge, protège /api et /mcp, session, route
+├── init.php            charge le socle, les modèles, les contrôleurs
+├── routes.php          toutes les routes : 'GET /items/{id}' => 'items_show'
+├── models/items.php        M : le métier, en fonctions pures
+├── controllers/items.php   C : une fonction par action
+├── controllers/api.php     d'autres contrôleurs : /api (vide au départ)
+├── controllers/mcp.php     et /mcp (vide au départ)
+├── views/layout.php        V : la page complète
+├── views/items/index.php   une page par action
+├── views/items/_list.php   un `_` = fragment htmx
+├── compose.yml         son conteneur (base dans la stack)
+├── .env                ses secrets (gitignoré)
+├── data/               JSON + sessions (jamais servi)
+└── tests/              *_test.php, lancés par stackfast check
 ```
 
-La règle la plus importante : **le métier vit dans `lib/`, en fonctions pures.**
-Pas de `$_POST`, pas de `$_SESSION`, pas d'`echo`. Arguments en entrée, valeur ou exception en sortie.
+C'est un MVC en fonctions : pas de classe, pas de framework, toujours la même organisation.
+**Une ressource = trois fichiers** (`models/x.php`, `controllers/x.php`, `views/x/`), et une action = une ligne dans `routes.php`.
 
-Pourquoi ? Parce qu'une fonction pure :
+| Couche | Fait | Ne fait jamais |
+|---|---|---|
+| Modèle | le métier et son stockage, en fonctions pures (arguments en entrée, valeur ou exception en sortie) | toucher `$_POST`, la session, ni `echo` |
+| Contrôleur | lit la requête, appelle le modèle, rend une vue | lire un fichier, écrire du HTML |
+| Vue | affiche les variables reçues (`e()`, `url()`, boucles) | appeler le modèle |
 
-- se teste sans serveur (`php tests/items_test.php`) ;
-- se branche sur trois surfaces sans réécriture : l'interface htmx, `/api`, `/mcp`.
+Pourquoi un modèle pur ? Parce qu'une fonction pure se teste sans serveur et se branche sur trois surfaces sans réécriture : l'interface htmx, `/api`, `/mcp`.
 
-`index.php` ne fait que le pont. Un handler lit la requête, appelle `lib/`, rend une vue.
+Ce que contient `routes.php` du gabarit :
 
-Les helpers communs viennent de la stack (`stacks/php-htmx/lib/bootstrap.php`, namespace `Stack\`) :
+```php
+return [
+    'GET /'           => 'items_index',
+    'GET /items/{id}' => 'items_show',
+    'POST /items'     => 'items_create',
+];
+```
+
+`{id}` capte un segment de l'URL et arrive à la fonction du contrôleur comme argument. Aucune route ne correspond : 404.
+
+Le socle commun vient de la stack (`stacks/php-htmx/lib/stack.php`, namespace `Stack\`) :
 
 | Helper | Rôle |
 |---|---|
+| `dispatch($routes)` | trouve l'action correspondant à la requête et l'appelle |
 | `url('/items')` | lien avec le bon préfixe |
 | `path()` | chemin demandé, sans préfixe ni query |
 | `method()` | `GET`, `POST`… |
-| `render('home', [...])` | page complète, ou fragment si requête htmx |
+| `render('items/index', [...])` | page complète, ou fragment si requête htmx |
 | `e($x)` | échappement HTML, sur **toute** valeur dans une vue |
 | `csrf_token()`, `csrf_check()` | protection des formulaires |
 | `json_read()`, `json_write()` | données, écriture atomique |
@@ -225,6 +242,18 @@ Les helpers communs viennent de la stack (`stacks/php-htmx/lib/bootstrap.php`, n
 | `session_start_app($slug)` | session avec un cookie propre à l'app |
 
 Une app ne copie jamais ces helpers. Elle fait `use function Stack\{url, render, ...}`.
+
+### Les dépendances composer
+
+| Besoin | Où |
+|---|---|
+| Lib tierce pour **toutes** les apps | `stacks/php-htmx/composer.json` (dans le hub), `composer.lock` commité ; `stackfast update` reconstruit l'image et teste toutes les apps |
+| Lib tierce pour **une** app | `stackfast composer mon-app require vendor/paquet` : `composer.json` et `composer.lock` de l'app commités, `vendor/` hors git, installé par `stackfast up` |
+| Tes helpers pour toutes les apps | `stacks/php-htmx/lib/`, sans composer |
+| Ta lib réutilisée ailleurs | un repo GitHub à elle, versions taguées, déclaré en dépôt `vcs` dans un `composer.json` |
+| Ta lib en cours d'écriture, partagée par 2 apps | `packages/<nom>/` dans l'instance, dépôt `path`, extraite quand elle se stabilise |
+
+Une même lib n'est jamais à deux niveaux : `stackfast composer` refuse un paquet déjà fourni par la stack. `stackfast audit` passe `composer audit` partout.
 
 ---
 
@@ -240,23 +269,24 @@ proxy de l'instance (Caddy)   TLS ; retire /mon-app du chemin ; pose X-Base-Path
    │  réseau privé de l'app
    ▼
 conteneur main-mon-app        FrankenPHP, app montée en /app
-   │  Caddyfile de la stack : tout vers index.php, sauf lib/ views/ data/ tests/ (404)
+   │  Caddyfile de la stack : tout vers index.php, sauf models/ controllers/ views/ data/ tests/ (404)
    ▼
-index.php
-   │  path() = "/"   method() = "GET"
-   │  route "GET /" → items_list() → render('home')
+index.php → dispatch(routes.php)
+   │  path() = "/"   method() = "GET"   →   'GET /' => items_index
    ▼
-render() : pas de header HX-Request → layout.php + home.php (page complète)
+controllers/items.php : items_index() → items_all() (modèle) → render('items/index')
+   ▼
+render() : pas de header HX-Request → views/layout.php + views/items/index.php (page complète)
 ```
 
 Tu ajoutes un item. Le formulaire porte `hx-post`. htmx envoie `POST /mon-app/items` avec le header `HX-Request: true`.
 
 ```
-index.php → route "POST /items"
+dispatch → 'POST /items' => items_create
    │  csrf_check()          première ligne, toujours
-   │  items_add($store, …)  métier pur
+   │  items_add($label)     le modèle, pur
    ▼
-render() : HX-Request présent → seulement views/partials/items.php
+render() : HX-Request présent → seulement views/items/_list.php
 ```
 
 htmx remplace la liste dans la page. Pas de JSON, pas de JavaScript maison. La réponse HTML **contient** les actions possibles (liens, formulaires). C'est l'hypermedia.
@@ -306,14 +336,13 @@ Token vide ou absent dans `.env` → 401 pour tout le monde. C'est voulu.
 
 ### Ajouter un endpoint REST
 
-Dans `lib/api.php`, sans toucher `index.php` :
+Dans `controllers/api.php`, sans toucher `index.php` :
 
 ```php
 function api_endpoints(): array
 {
-    $store = APP . '/data/items.json';
     return [
-        'GET /items' => fn () => ['items' => items_list($store)],
+        'GET /items' => fn () => ['items' => items_all()],
     ];
 }
 ```
@@ -322,16 +351,15 @@ La clé est `MÉTHODE /chemin`, relatif à `/api`. Le callable rend un tableau, 
 
 ### Ajouter un outil MCP
 
-Dans `lib/mcp.php` :
+Dans `controllers/mcp.php` :
 
 ```php
 function mcp_tools(): array
 {
-    $store = APP . '/data/items.json';
     return [
         'lister_items' => [
             'description' => 'Liste les items de mon-app',
-            'handler' => fn (array $args) => items_list($store),
+            'handler' => fn (array $args) => items_all(),
         ],
     ];
 }
@@ -345,7 +373,7 @@ curl -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   https://apps.example.com/mon-app/mcp
 ```
 
-Remarque : les deux exemples appellent `items_list()`, la même fonction que l'interface. C'est le bénéfice du métier pur : une surface de plus = un adaptateur de trois lignes.
+Remarque : les deux exemples appellent `items_all()`, la même fonction que l'interface. C'est le bénéfice du métier pur : une surface de plus = un adaptateur de trois lignes.
 
 Le dispatch lui-même vit dans la stack (`stacks/php-htmx/lib/mcp_api.php`). Une notification JSON-RPC (sans `id`) reçoit 202 sans corps. Une méthode inconnue reçoit l'erreur `-32601`.
 
@@ -586,6 +614,6 @@ stackfast update && stackfast audit        # faille PHP annoncée
 
 Les trois réflexes :
 
-1. **Le métier dans `lib/`**, pur. Tout le reste est un adaptateur.
+1. **Le métier dans `models/`**, pur. Contrôleurs et vues ne sont que des adaptateurs.
 2. **Pas de « terminé » sans `stackfast check` vert** cité.
 3. **Chaque correction devient une ligne**, au plus bas niveau où elle est vraie.

@@ -1,0 +1,4 @@
+/* Source du CSS de l'app, compilée par Tailwind (bin/build en développement, le Dockerfile en production) vers assets/app.css. */
+@import "tailwindcss";
+/* Fichiers où Tailwind cherche les classes utilisées. */
+@source "../../views";

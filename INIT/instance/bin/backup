@@ -1,0 +1,119 @@
+#!/usr/bin/env sh
+# Sauvegarde ce que git ne contient pas : données et secrets de chaque app, config d'instance, certificats du proxy.
+#   bin/backup [<slug>…] [--dest <dossier>] [--keep <n>] [--no-certs]
+# Une archive datée dans backups/ (BACKUP_DIR), chmod 600 ; les n dernières sont gardées (7 par défaut, BACKUP_KEEP).
+# BACKUP_PASSPHRASE dans le .env : l'archive est chiffrée (AES-256) — à faire avant de la copier hors du serveur.
+# Le code des apps n'y est pas : il est dans git (commit + push). Une sauvegarde sur le même disque ne protège pas
+# d'une panne du serveur : copie-la ailleurs (rsync, scp, rclone). Restaurer : bin/restore.
+. "$(dirname "$0")/lib.sh"
+
+usage() { sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-1}"; }
+
+DEST="${BACKUP_DIR:-backups}"; KEEP="${BACKUP_KEEP:-7}"; certs=1; targets=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dest) DEST="${2:?--dest <dossier>}"; shift 2 ;;
+    --keep) KEEP="${2:?--keep <n>}"; shift 2 ;;
+    --no-certs) certs=0; shift ;;
+    -h|--help) usage 0 ;;
+    -*) usage ;;
+    *) targets="$targets $1"; shift ;;
+  esac
+done
+case "$KEEP" in ''|*[!0-9]*) die "--keep : un nombre" ;; esac
+[ -n "$targets" ] || targets="$(apps | cut -d' ' -f2 | tr '\n' ' ')"
+for s in $targets; do app_dir "$s" >/dev/null; done
+
+mkdir -p "$DEST"
+chmod 700 "$DEST"
+DEST="$(cd "$DEST" && pwd)"
+# Le dossier de sauvegarde, s'il est dans l'instance, ne doit jamais finir dans git.
+case "$DEST" in
+  "$ROOT"/*) rel="${DEST#"$ROOT"/}/"; touch .gitignore; grep -qxF "$rel" .gitignore || echo "$rel" >> .gitignore ;;
+esac
+
+stage="$(mktemp -d "$DEST/.stage.XXXXXX")"
+trap 'rm -rf "$stage"' EXIT
+chmod 700 "$stage"
+
+# Config d'instance : réglages, domaines, ta config Caddy, mot de passe (haché) des previews.
+for f in .env proxy/Caddyfile proxy/domains proxy/preview-auth; do
+  [ -f "$f" ] || continue
+  mkdir -p "$stage/instance/$(dirname "$f")"
+  cp -p "$f" "$stage/instance/$f"
+done
+
+napps=0
+for slug in $targets; do
+  d="$(app_dir "$slug")"; out="$stage/apps/$slug"
+  mkdir -p "$out/data"
+  for f in .env .env.agent; do
+    if [ -f "$d/$f" ]; then cp -p "$d/$f" "$out/$f"; fi
+  done
+  if [ -d "$d/data" ]; then
+    # Les sessions PHP sont jetables (data/.sessions) : exclues.
+    ( cd "$d/data" && tar --exclude=./.sessions -cf - . ) | tar -C "$out/data" -xf -
+  fi
+  # SQLite : une copie à chaud du fichier peut être incohérente ; .backup donne une copie cohérente.
+  c="$(app_container "$slug")"
+  running="$(docker inspect -f '{{.State.Running}}' "$c" 2>/dev/null || true)"
+  find "$out/data" -type f \( -name '*.sqlite' -o -name '*.sqlite3' -o -name '*.db' \) | while read -r f; do
+    rel="${f#"$out/data/"}"
+    if [ "$running" = true ]; then
+      # La copie est écrite dans data/ (montage visible de l'hôte ; `docker cp` ne lit pas le tmpfs /tmp), puis déplacée.
+      if docker exec "$c" sqlite3 "/app/data/$rel" ".backup '/app/data/$rel.sfbak'" >/dev/null 2>&1 \
+         && mv "$d/data/$rel.sfbak" "$f"; then
+        rm -f "$f-wal" "$f-shm"
+        say sqlite "$slug/$rel : copie cohérente (.backup)"
+      else
+        rm -f "$d/data/$rel.sfbak"
+        say attention "$slug/$rel : .backup impossible, copie brute (arrête l'app pour une copie sûre)"
+      fi
+    else
+      say sqlite "$slug/$rel : app arrêtée, copie brute cohérente"
+    fi
+  done
+  napps=$((napps + 1))
+done
+
+certs_in=0
+if [ "$certs" = 1 ]; then
+  vol="$INSTANCE-proxy_data"
+  if docker volume inspect "$vol" >/dev/null 2>&1; then
+    # Sans eux, un serveur neuf redemande tous les certificats (limites de Let's Encrypt).
+    docker run --rm -v "$vol:/data:ro" -v "$stage:/out" --entrypoint sh caddy:2 \
+      -c "tar -cf /out/certs.tar -C /data . && chown $(id -u):$(id -g) /out/certs.tar"
+    certs_in=1
+  fi
+fi
+
+{
+  echo "stackfast-backup=1"
+  echo "instance=$INSTANCE"
+  echo "date=$(date +%Y-%m-%dT%H:%M:%S%z)"
+  echo "host=$(hostname)"
+  echo "apps=$(echo $targets)"
+  echo "certs=$certs_in"
+} > "$stage/manifest"
+
+name="$INSTANCE-$(date +%Y%m%d-%H%M%S)"
+if [ -n "${BACKUP_PASSPHRASE:-}" ]; then
+  file="$DEST/$name.tar.gz.enc"
+  tar -C "$stage" -czf - . | openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:BACKUP_PASSPHRASE -out "$file"
+else
+  file="$DEST/$name.tar.gz"
+  tar -C "$stage" -czf "$file" .
+fi
+chmod 600 "$file"
+
+# Relue : une sauvegarde qu'on ne sait pas lire n'en est pas une.
+nfiles="$(cat_archive "$file" | tar -tzf - | grep -vc '/$' || true)"
+[ "${nfiles:-0}" -gt 0 ] || die "archive illisible ou vide : $file"
+
+ls -1t "$DEST/$INSTANCE"-*.tar.gz* 2>/dev/null | tail -n +"$((KEEP + 1))" | while read -r old; do rm -f "$old"; done
+
+say sauvegarde "$file ($(du -h "$file" | cut -f1), $nfiles fichiers, $napps app(s)$([ "$certs_in" = 1 ] && echo ', certificats')$([ -n "${BACKUP_PASSPHRASE:-}" ] && echo ', chiffrée'))"
+if [ -n "$(git status --porcelain -- apps 2>/dev/null)" ]; then
+  say attention "du code est modifié dans apps/ sans être commité : il n'est PAS dans cette sauvegarde (git commit && git push)"
+fi
+[ -n "${BACKUP_PASSPHRASE:-}" ] || say conseil "l'archive contient tes secrets en clair : BACKUP_PASSPHRASE dans .env pour la chiffrer avant de la copier ailleurs"

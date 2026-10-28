@@ -1,0 +1,39 @@
+# Serveur de l'app __SLUG__ (dans son conteneur). HTTP seul sur :8080 : TLS et domaines sont l'affaire du Caddy du serveur.
+{
+	admin off
+	auto_https off
+	persist_config off
+	frankenphp {
+		num_threads 4
+		# Mode worker : l'app reste chargée en mémoire (environ 3x plus de requêtes par seconde, mesuré le 28/10).
+		# `watch` recharge les workers dès qu'un fichier change : le développement à chaud fonctionne.
+		# Pour revenir au mode classique (une requête = un chargement), retire ce bloc `worker`.
+		worker {
+			file /app/index.php
+			num 4
+			watch
+		}
+	}
+}
+
+:8080 {
+	root * /app
+	encode zstd gzip
+
+	# Jamais servis : code, vues, données, tests, outils.
+	@private_dirs path /core /core/* /models /models/* /controllers /controllers/* /views /views/* /migrations /migrations/* /bin /bin/* /tests /tests/* /data /data/* /vendor /vendor/* /services /services/* /assets/src /assets/src/* /init.php /routes.php
+	# Fichiers sensibles qui existent sur le disque (une route /x.json qui n'est pas un fichier passe à index.php).
+	@private_files {
+		path */.* *.md *.json *.lock *.log *.tmp *.yml *.yaml *.ini *.sh *.sql *.sqlite *.sqlite-* *.db /Dockerfile /Caddyfile
+		file
+	}
+	# CSS et JS : cache d'un an, le lien porte la version du fichier (asset()).
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+
+	route {
+		respond @private_dirs 404
+		respond @private_files 404
+		php_server
+	}
+}

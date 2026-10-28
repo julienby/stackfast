@@ -1,0 +1,8 @@
+{
+    "stack": "php-htmx",
+    "recipe": "__RECIPE__",
+    "recipe_commit": "__RECIPE_COMMIT__",
+    "slug": "__SLUG__",
+    "port": 8080,
+    "modules": ["sqlite"]
+}

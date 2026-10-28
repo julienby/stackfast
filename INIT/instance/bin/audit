@@ -1,40 +1,42 @@
 #!/usr/bin/env sh
-# État de sécurité de l'instance, en une commande : version réellement servie de chaque stack vs dernier
-# correctif publié, réglages de durcissement, apps qui tournent encore sur une ancienne image, proxy.
+# État de sécurité du serveur, en une commande. Pour chaque app : son propre audit (bin/audit : PHP servi vs dernier
+# correctif, durcissement, failles composer), image en service, santé. Puis sauvegardes et proxy.
 # Exit 1 si une action est nécessaire : utilisable en cron (`stackfast audit >/dev/null || alerte`).
 . "$(dirname "$0")/lib.sh"
 
 status=0
-
-for stack in $(apps | cut -d' ' -f1 | sort -u); do
-  img="$(image "$stack"):current"
-  echo "## stack $stack"
-  if ! docker image inspect "$img" >/dev/null 2>&1; then
-    echo "  image absente → stackfast update $stack"; status=1; continue
+for slug in $(apps | cut -d' ' -f2); do
+  d="$(app_dir "$slug")"; img="$(app_image "$slug"):current"
+  echo "## $slug ($(json_get "$d/stackfast.json" recipe))"
+  if [ -x "$d/bin/audit" ]; then
+    ( cd "$d" && bin/audit ) || status=1
   fi
-  echo "  image construite le $(docker image inspect -f '{{.Created}}' "$img" | cut -c1-10)"
-  if [ -x "stacks/$stack/audit" ]; then
-    "stacks/$stack/audit" "$img" || status=1
+  # Un conteneur garde son ancienne image (donc l'ancien PHP) tant qu'il n'est pas recréé.
+  c="$(app_container "$slug")"
+  id="$(docker inspect -f '{{.Image}}' "$c" 2>/dev/null || true)"
+  cur="$(docker image inspect -f '{{.Id}}' "$img" 2>/dev/null || true)"
+  health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$c" 2>/dev/null || true)"
+  if [ -z "$id" ]; then echo "  conteneur : arrêté"
+  elif [ "$id" != "$cur" ]; then echo "  conteneur : ANCIENNE IMAGE → stackfast up $slug"; status=1
+  elif [ "$health" != healthy ]; then echo "  conteneur : $health → stackfast logs $slug"; status=1
+  else echo "  conteneur : sain, image à jour"
   fi
-  image_stale "$stack" && { echo "  la stack a changé depuis la construction → stackfast update $stack"; status=1; }
-
-  # Un conteneur garde son ancienne image (et donc l'ancien PHP) tant qu'il n'est pas recréé.
-  current_id="$(docker image inspect -f '{{.Id}}' "$img")"
-  apps "$stack" | while read -r s slug; do
-    c="$(app_container "$slug")"
-    id="$(docker inspect -f '{{.Image}}' "$c" 2>/dev/null || true)"
-    health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$c" 2>/dev/null || echo arrêtée)"
-    if [ -z "$id" ]; then echo "  $slug : arrêtée"
-    elif [ "$id" != "$current_id" ]; then echo "  $slug : ANCIENNE IMAGE → stackfast up $slug"; exit 1
-    elif [ "$health" != healthy ]; then echo "  $slug : $health → stackfast logs $slug"; exit 1
-    else echo "  $slug : ok"
-    fi
-  done || status=1
 done
+
+# Sauvegardes : données et .env ne sont que sur ce serveur (data/ et .env sont hors git).
+echo "## sauvegardes"
+lb="$(last_backup)"
+if [ -z "$lb" ]; then
+  echo "  aucune sauvegarde → stackfast backup"; status=1
+else
+  age=$(( ( $(date +%s) - $(stat -c %Y "$lb") ) / 86400 ))
+  if [ "$age" -gt "${BACKUP_MAX_AGE_DAYS:-2}" ]; then echo "  dernière : $(basename "$lb") (il y a $age j) → stackfast backup"; status=1
+  else echo "  dernière : $(basename "$lb") (il y a $age j)"; fi
+fi
 
 echo "## proxy"
 if docker inspect "$PROXY" >/dev/null 2>&1; then
-  echo "  $(docker exec "$PROXY" caddy version | cut -d' ' -f1), image du $(docker inspect -f '{{.Created}}' "$(docker inspect -f '{{.Image}}' "$PROXY")" | cut -c1-10) (stackfast update proxy pour la rafraîchir)"
+  echo "  $(docker exec "$PROXY" caddy version | cut -d' ' -f1), image du $(docker inspect -f '{{.Created}}' "$(docker inspect -f '{{.Image}}' "$PROXY")" | cut -c1-10)"
 else
   echo "  arrêté → stackfast proxy"; status=1
 fi

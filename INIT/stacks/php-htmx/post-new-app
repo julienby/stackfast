@@ -1,9 +1,0 @@
-#!/usr/bin/env sh
-# Après bin/new : token /api + /mcp dans le .env de l'app. Arguments : <slug> <dossier de l'app>.
-set -eu
-SLUG="$1"
-DEST="$2"
-
-ENV_VAR="$(echo "$SLUG" | tr 'a-z-' 'A-Z_')_API_TOKEN"
-echo "$ENV_VAR=$(openssl rand -hex 32)" >> "$DEST/.env"
-echo "token      : $ENV_VAR (bearer /api + /mcp), dans $DEST/.env"

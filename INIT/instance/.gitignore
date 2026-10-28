@@ -1,5 +1,9 @@
 PLAN.md
 .env
-apps/*/*/data/*
-!apps/*/*/data/.gitkeep
+# Chaque app est un dépôt git à part : le dépôt de l instance ne les suit pas.
+apps/
 proxy/generated.caddy*
+proxy/preview-auth
+.agents/
+backups/
+.restore.*/

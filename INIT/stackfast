@@ -11,19 +11,23 @@ usage() {
 stackfast <commande>
 
 Dans une instance (n'importe quel sous-dossier) — les apps :
-  new <stack> <slug>      crée l'app et la met en ligne sur https://\$APPS_HOST/<slug>/
+  new <recette> <slug>    crée une app autonome (son dépôt dans apps/<slug>) et la met en ligne sur https://\$APPS_HOST/<slug>/
   ls                      apps, état, adresse
   domain <slug> [<dom>]   donne une adresse (app1.domaine.fr, puis domaine1.fr…) ; les anciennes redirigent
   domain <slug> --rm <d>  retire un domaine
-  check [<slug>|<stack>]  lint + tests dans l'image de la stack
+  check [<slug>]          lint, tests, marqueurs de conflit (le bin/check de l'app)
   up <slug>… | --all      démarre / applique la config ; down <slug> arrête
   logs <slug> [-f]        logs (erreurs PHP comprises) ; shell <slug> : shell dans le conteneur
   audit                   sécurité : version PHP servie vs dernier correctif, apps sur une ancienne image
-  update [<stack>|proxy]  reconstruit avec le dernier correctif, teste toutes les apps, bascule
-  rollback <stack>        revient à l'image précédente
+  update [<slug>|proxy]   reconstruit chaque image avec le dernier correctif PHP/Caddy, teste, bascule
+  rollback <slug>         revient à l'image précédente d'une app
+  composer <slug> <cmd>   dépendances composer d'une app (require, remove, update…)
+  backup [<slug>…]        sauvegarde data/ + .env de chaque app, config d'instance, certificats (chiffrable)
+  restore <archive> [<slug>…]  restaure (--list pour voir, --certs, --no-instance) ; l'ancien état est mis de côté
+  agent …                 agents isolés : en refonte (phase 4) ; en attendant, cd apps/<slug> && claude
   deploy                  git pull + up --all (sur le VPS)
   proxy                   régénère et recharge Caddy
-  migrate <stack> <slug>  passe une app de l'ancien conteneur partagé à son propre conteneur
+  migrate                 migration des anciens projets : phase 5
 
 Le hub :
   status              changements locaux + écart avec GitHub
@@ -31,8 +35,8 @@ Le hub :
   push "message"      commit + pull --rebase + push des changements locaux du hub
   link                (re)crée les liens : CLAUDE global, skills
   skill add <dossier> déplace une skill dans le hub et la relie
-  init <dossier>      crée une instance (sans écraser) + ses stacks
-  sync [--force] [dossier]  remet bin/, .claude/, proxy/compose.yml et stacks/ d'une instance au niveau du hub
+  init <dossier>      crée une instance (le dossier serveur : proxy, outils, apps/)
+  sync [--force] [dossier]  remet bin/, .claude/ et proxy/compose.yml d'une instance au niveau du hub
                       (défaut : .) ; stop si l'un d'eux a été modifié localement, sauf --force
 
 Hub : $HUB
@@ -167,30 +171,16 @@ sync_owned() {
   echo "instance   : bin/ .claude/ proxy/compose.yml (synchronisés)"
 }
 
-# Stacks : remplacées par celles du hub (elles lui appartiennent), apps/ jamais touché.
-# Stop si un fichier a été modifié, ajouté ou supprimé depuis la dernière sync, sauf --force.
+# Remet les outils de l'instance (bin/, .claude/, proxy/compose.yml) au niveau du hub. Ne touche jamais apps/ :
+# chaque app est autonome et porte sa propre copie de la recette (stackfast upgrade <app> pour la faire évoluer).
 cmd_sync() {
   force=0
   [ "${1:-}" = --force ] && { force=1; shift; }
   dest="${1:-.}"
   sync_owned "$force" "$dest"
-  for stack in "$SRC"/stacks/*/; do
-    name="$(basename "$stack")"
-    d="$dest/stacks/$name"
-    if [ "$force" -eq 0 ] && [ -f "$d/$SUMS" ]; then
-      changed="$(sums "$d" | diff "$d/$SUMS" - | awk '/^[<>]/ {print $3}' | sort -u)"
-      if [ -n "$changed" ]; then
-        echo "Modifs locales dans stacks/$name (depuis la dernière sync) :" >&2
-        echo "$changed" >&2
-        die "reporte-les dans le hub, ou écrase-les : stackfast sync --force"
-      fi
-    fi
-    mkdir -p "$d"
-    find "$d" -mindepth 1 -maxdepth 1 ! -name vendor -exec rm -rf {} +
-    cp -R "$stack". "$d/"
-    sums "$d" > "$d/$SUMS"
-    echo "stack      : stacks/$name (synchronisée)"
-  done
+  # Ancien modèle : la stack partagée copiée dans l'instance ne sert plus.
+  [ -d "$dest/stacks" ] && echo "note       : $dest/stacks/ ne sert plus (les recettes restent dans le hub) ; supprime-le quand plus aucune app de l'ancien modèle ne tourne"
+  return 0
 }
 
 # Commande d'instance : remonte jusqu'à la racine de l'instance (bin/lib.sh) et lance bin/<commande>.
@@ -200,7 +190,8 @@ cmd_instance() {
   while [ "$dir" != / ] && [ ! -f "$dir/bin/lib.sh" ]; do dir="$(dirname "$dir")"; done
   [ -f "$dir/bin/lib.sh" ] || die "$name : à lancer dans une instance (aucun bin/lib.sh au-dessus de $PWD)"
   [ -x "$dir/bin/$name" ] || die "$name : commande absente de l'instance ($dir/bin/$name) — stackfast sync ?"
-  exec "$dir/bin/$name" "$@"
+  # Le client sait où est le hub : les commandes d'instance y trouvent la méthode (CLAUDE.global.md) pour les sandboxes d'agents.
+  STACKFAST_HOME="$HUB" exec "$dir/bin/$name" "$@"
 }
 
 cmd="${1:-}"
@@ -214,7 +205,7 @@ case "$cmd" in
   init)    cmd_init "$@" ;;
   sync)    cmd_sync "$@" ;;
   new-app) cmd_instance new "$@" ;;
-  new|ls|domain|check|up|down|logs|shell|audit|update|rollback|deploy|proxy|migrate)
+  new|ls|domain|check|up|down|logs|shell|audit|update|rollback|deploy|proxy|migrate|agent|backup|restore|composer)
            cmd_instance "$cmd" "$@" ;;
   *)       usage ;;
 esac

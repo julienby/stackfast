@@ -1,29 +1,16 @@
 #!/usr/bin/env sh
-# Vérifie une app, toutes les apps d'une stack, ou tout : lint + tests, dans l'image de la stack.
+# Vérifie une app, ou toutes : lint, marqueurs de conflit, tests. Lance le bin/check de chaque app.
 #   bin/check            toutes les apps
 #   bin/check <slug>     une app
-#   bin/check <stack>    toutes les apps de la stack
-# Chaque stack fournit stacks/<stack>/check <dossier de l'app> ; IMAGE peut imposer l'image (bin/update).
 . "$(dirname "$0")/lib.sh"
 
-# Ancienne forme « bin/check <stack> <slug> » acceptée.
-[ $# -ge 2 ] && shift
-if [ $# -eq 0 ]; then
-  targets="$(apps)"
-elif [ -d "stacks/$1" ] && ! ls -d apps/*/"$1" >/dev/null 2>&1; then
-  targets="$(apps "$1")"
-else
-  targets="$(app_stack "$1") $1"
-fi
+[ $# -gt 0 ] && targets="$1" || targets="$(apps | cut -d' ' -f2)"
 [ -n "$targets" ] || { echo "rien à vérifier"; exit 0; }
 
 status=0
-echo "$targets" | {
-  while read -r stack slug; do
-    echo "### $slug ($stack)"
-    img="${IMAGE:-$(image "$stack"):current}"
-    docker image inspect "$img" >/dev/null 2>&1 || { echo "image $img absente : stackfast update $stack"; status=1; continue; }
-    IMAGE="$img" "stacks/$stack/check" "apps/$stack/$slug" || status=1
-  done
-  exit "$status"
-}
+for slug in $targets; do
+  d="$(app_dir "$slug")"
+  echo "### $slug"
+  ( cd "$d" && bin/check ) || status=1
+done
+exit "$status"

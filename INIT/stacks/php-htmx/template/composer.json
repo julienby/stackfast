@@ -1,0 +1,12 @@
+{
+    "name": "stackfast/app",
+    "description": "Dépendances de l'app. Une lib = une ligne dans les décisions de AGENTS.md. Ajouter : stackfast composer <slug> require vendor/paquet",
+    "type": "project",
+    "require": {
+        "php": ">=8.5"
+    },
+    "config": {
+        "sort-packages": true,
+        "optimize-autoloader": true
+    }
+}

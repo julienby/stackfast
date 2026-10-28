@@ -41,6 +41,8 @@ php.net publie parfois quelques heures avant les images Docker. `audit` le dit (
 - les réglages de durcissement de la stack sont déjà actifs (`php.ini`) : `session.upload_progress.enabled = 0` et `fatal_error_backtraces = 0` coupent les chemins connus de CVE-2026-109619 ; les limites de taille de requête (PHP et proxy à 32 Mo) et le plafond mémoire par conteneur réduisent ceux de CVE-2026-109618 ;
 - relance `stackfast update` plus tard.
 
+Les sandboxes d'agents (`stackfast agent`) embarquent le même PHP et servent une preview : `update` reconstruit aussi leur image, et `audit` liste celles qui tournent encore sur l'ancienne (`stackfast agent start <slug> <nom>` les recrée).
+
 ## Pourquoi cette architecture limite les dégâts
 
 - **Un conteneur par app** : une app compromise ne lit ni le code, ni les données, ni les secrets des autres (chaque app a son `.env`, son réseau).

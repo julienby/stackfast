@@ -1,5 +1,7 @@
 # Déployer sur un VPS
 
+> **À mettre à jour.** Ce document décrit l'ancien modèle (image partagée par stack, `apps/<stack>/<slug>`). Les apps sont désormais autonomes : voir [ARCHITECTURE.md](../ARCHITECTURE.md) et le `AGENTS.md` de la recette.
+
 Une instance = un repo sur le VPS. Elle porte son propre Caddy (`proxy/`, ports 80/443) et un conteneur par app.
 Prérequis : Docker + `docker compose` v2.17 ou plus, `git`, `curl`, `openssl`, ports 80/443 libres.
 
@@ -60,6 +62,8 @@ Procédure complète : [SECURITE.md](SECURITE.md).
 
 ## 7. Migrer une instance de l'ancien modèle (un conteneur Apache partagé)
 
+**Étape 0 : sauvegarde.** Les apps de l'ancien modèle ne sont pas encore vues par `stackfast backup` : prends l'instantané à la main (commandes dans [SAUVEGARDE.md](SAUVEGARDE.md), « Avant de migrer »), copie-le hors du serveur, et garde la config de ton Caddy actuel.
+
 1. `stackfast pull && stackfast sync` dans l'instance. `proxy/Caddyfile`, `proxy/domains` et `proxy/compose.yml` arrivent.
 2. Dans `.env` : ajouter `APPS_HOST` et `STACKFAST_INSTANCE` (voir `.env.example`). `PROXY_NETWORK` et `PHP_HTMX_CONTAINER` ne servent plus.
 3. Ton Caddy existant tient les ports 80/443 : recopie ses blocs hors apps dans `proxy/Caddyfile`, puis arrête-le.
@@ -67,7 +71,8 @@ Procédure complète : [SECURITE.md](SECURITE.md).
    Une app qui avait un domaine dédié : `stackfast domain <slug> <domaine>`.
    Une app qui avait un `services/*/docker-compose.yml` : ce service passe dans son `compose.yml` (modèle `worker` commenté).
 5. `docker rm -f php-htmx` (l'ancien conteneur partagé), puis retire les `<SLUG>_*` du `.env` de l'instance.
-6. `stackfast audit` doit dire « rien à faire ».
+6. `stackfast backup` : première sauvegarde du nouveau modèle (data/ et .env de chaque app) ; mets-la en cron ([SAUVEGARDE.md](SAUVEGARDE.md)).
+7. `stackfast audit` doit dire « rien à faire ».
 
 ## Ce qui a été testé
 

@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+# Vérifie l'app : lint PHP, marqueurs de conflit, tests. Depuis l'hôte, dans le dossier de l'app ; Docker suffit.
+# Les tests tournent dans un conteneur jetable de l'image de l'app, sur le code actuel (monté), base SQLite temporaire.
+set -eu
+cd "$(dirname "$0")/.."
+exec docker compose run --rm --no-deps -T web sh tests/run.sh

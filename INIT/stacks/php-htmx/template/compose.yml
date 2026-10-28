@@ -1,0 +1,56 @@
+# Conteneur(s) de l'app __SLUG__. Autonome : `bin/build` puis `docker compose up -d --build` suffisent.
+# stackfast l'utilise tel quel (stackfast up __SLUG__) et relie son réseau au Caddy du serveur.
+name: ${STACKFAST_INSTANCE:-main}-__SLUG__
+
+services:
+  web:
+    build: .
+    image: ${STACKFAST_INSTANCE:-main}-__SLUG__:current
+    container_name: ${STACKFAST_INSTANCE:-main}-__SLUG__
+    restart: unless-stopped
+    env_file: .env
+    # uid de l'hôte : data/ reste lisible et éditable des deux côtés, jamais de root dans le conteneur.
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+      - /data:mode=1777      # données internes de Caddy (pas celles de l'app, qui sont dans /app/data)
+      - /config:mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 1.0
+    pids_limit: 128
+    volumes:
+      - ./:/app              # développement : le code est lu à chaud
+    healthcheck:
+      test: ["CMD", "php", "/app/bin/healthcheck.php"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks: [front]
+
+  # Conteneur en plus, seulement si l'architecture l'impose (décision écrite dans AGENTS.md).
+  # L'app le joint par son nom de service : http://worker:8000. Ajouter `back` aux networks de web.
+  # worker:
+  #   build: ./services/worker
+  #   restart: unless-stopped
+  #   env_file: .env
+  #   read_only: true
+  #   cap_drop: [ALL]
+  #   security_opt: [no-new-privileges:true]
+  #   mem_limit: 256m
+  #   networks: [back]
+
+networks:
+  # Réseau de l'app, partagé seulement avec le Caddy du serveur. Aucune autre app ne le voit.
+  front:
+    name: ${STACKFAST_INSTANCE:-main}-__SLUG__
+  # back:
+  #   internal: true

@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+# Dépendances composer d'une app (chaque app a les siennes, aucune n'est partagée).
+#   bin/composer <slug> require vendor/paquet     ajoute une lib
+#   bin/composer <slug> remove vendor/paquet | update | install | audit …
+# Composer tourne dans un conteneur jetable (rien à installer sur le serveur). vendor/ reste dans l'app, hors git ;
+# composer.json et composer.lock sont commités dans le dépôt de l'app. `stackfast up` fait l'install tout seul.
+. "$(dirname "$0")/lib.sh"
+
+SLUG="${1:?usage: stackfast composer <slug> require vendor/paquet}"; shift
+[ $# -gt 0 ] || die "quelle commande composer ? (require, remove, update, install, audit…)"
+d="$(app_dir "$SLUG")"
+
+docker run --rm -u "$(id -u):$(id -g)" -e COMPOSER_HOME=/tmp/composer -v "$ROOT/$d:/app" -w /app composer:2 \
+  composer "$@" --no-interaction --no-progress \
+  || die "composer a échoué (voir ci-dessus)"
+say composer "$SLUG : $(grep -cE '^ {12}"name": "[^"]+/[^"]+",' "$d/composer.lock" 2>/dev/null || echo 0) paquet(s) verrouillé(s) ; pense à commiter composer.json et composer.lock"
