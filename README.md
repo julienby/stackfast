@@ -55,6 +55,7 @@ stackfast init ~/srv              # crée une instance (dossier serveur) ; stack
 
 - une erreur sur **une app** → « Leçons de l'app » dans son `AGENTS.md` ;
 - valable pour **toutes les apps d'une recette** → `INIT/stacks/<recette>/template/AGENTS.md` dans ce hub (les prochaines apps l'ont ; les existantes via `upgrade`, phase 4) ;
+INIT/mods/<mod>/         mods Claude Code (guard, check-bar)
 - valable **partout** → `~/.claude/CLAUDE.md` (lien vers `INIT/CLAUDE.global.md`), effet immédiat.
 
 `/retro` propose la ligne et son niveau ; rien n'est écrit sans accord.
@@ -64,6 +65,13 @@ stackfast init ~/srv              # crée une instance (dossier serveur) ; stack
 Phase 1 (recette autonome, outils serveur) : faite et testée sur Docker. Suite : déploiement sans coupure (2), modules (3), leçons et `upgrade`, agents en `git worktree` (4), migration des anciens projets (5). Voir [ARCHITECTURE.md](ARCHITECTURE.md).
 
 **Docs pas encore à jour** avec les apps autonomes : `docs/TUTORIEL.md`, `docs/tutoriel-visuel.html`, `docs/GETTING-STARTED.md`, `docs/DEPLOY-VPS.md` (elles décrivent l'image partagée par stack et `apps/<stack>/<slug>`). `stackfast agent` est en refonte (phase 4).
+
+## Mods Claude Code
+
+Deux mods dans `INIT/mods/`. Chargement : `claude --plugin-dir ~/.stackfast/INIT/mods/<mod>`.
+
+- `stackfast-guard` : sur une instance, refuse l'écriture dans `stacks/`, `bin/`, `.claude/` (sauf `settings.local.json`) et refuse `git add` de `.env`, `data/`, `vendor/`, `PLAN.md`.
+- `check-bar` : une ligne au-dessus du prompt : `bin/check` vert, rouge, ou pas lancé depuis la dernière modification. Ne voit que les runs lancés par le modèle, pas ceux du hook Stop.
 
 ## Repo
 

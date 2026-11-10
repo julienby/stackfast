@@ -81,5 +81,5 @@
 
 ## Lessons globales
 
-- 2026-09-28 — Un test Docker tourne sous un nom de projet compose unique (`-p`). (erreur observée : un compose de test a détruit le conteneur d'une autre instance)
-- 2026-10-06 — Après le remplacement ou l'édition d'un fichier ou d'un répertoire monté dans un conteneur, vérifier de l'intérieur qu'il voit le changement avant de tester ou de recharger. S'il ne le voit pas, recréer le conteneur. (erreurs observées : après une synchronisation, le conteneur gardait l'ancien montage, vide ; après l'édition d'une config montée seule, un reload n'aurait rien changé.)
+- 2026-09-28 — Un test tourne avec ses propres ressources, nommées de façon unique, pour ne jamais toucher celles d’une autre instance. (erreur observée : un test a détruit le conteneur d’une autre instance.)
+- 2026-10-06 — Après le remplacement d’une chose dont dépend un processus en cours, relance le processus et vérifie de son point de vue qu’il voit le changement avant de tester. (erreur observée : après une synchronisation, le conteneur gardait l’ancien montage, vide, et les tests échouaient.)

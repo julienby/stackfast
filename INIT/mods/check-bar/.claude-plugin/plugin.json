@@ -1,0 +1,1 @@
+{ "name": "check-bar", "version": "0.1.0", "description": "Une ligne au-dessus du prompt : état de bin/check (vert, rouge, pas lancé depuis la dernière modification).", "types": "./types/index.d.ts" }

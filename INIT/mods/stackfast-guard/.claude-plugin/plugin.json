@@ -1,0 +1,1 @@
+{ "name": "stackfast-guard", "version": "0.1.0", "description": "Sur une instance stackfast : refuse d'écrire dans stacks/, bin/, .claude/ et de commiter .env, data/, vendor/, PLAN.md." }
