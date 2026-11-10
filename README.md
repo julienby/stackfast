@@ -55,7 +55,6 @@ stackfast init ~/srv              # crée une instance (dossier serveur) ; stack
 
 - une erreur sur **une app** → « Leçons de l'app » dans son `AGENTS.md` ;
 - valable pour **toutes les apps d'une recette** → `INIT/stacks/<recette>/template/AGENTS.md` dans ce hub (les prochaines apps l'ont ; les existantes via `upgrade`, phase 4) ;
-INIT/mods/<mod>/         mods Claude Code (guard, check-bar)
 - valable **partout** → `~/.claude/CLAUDE.md` (lien vers `INIT/CLAUDE.global.md`), effet immédiat.
 
 `/retro` propose la ligne et son niveau ; rien n'est écrit sans accord.
@@ -82,6 +81,7 @@ INIT/install.sh          installeur idempotent du client (curl | sh)
 INIT/stackfast           le client : liens, pull/push, init/sync, et les verbes du serveur
 INIT/instance/           gabarit du dossier serveur : bin/ (les outils), proxy/ (Caddy), .claude/
 INIT/stacks/<recette>/   une recette : stack.json (version) et template/ (l'app autonome copiée par stackfast new)
+INIT/mods/<mod>/         mods Claude Code (guard, check-bar)
 INIT/skills/  INIT/codex/  INIT/CLAUDE.global.md   la méthode et les outils de travail
 docs/                    SECURITE, SAUVEGARDE, AGENTS-ISOLES, DEPLOY-VPS, tutoriels
 ```
