@@ -1,0 +1,126 @@
+#!/usr/bin/env sh
+# jbh : client de l'API jbh. Dépend de sh, curl et jq.
+#   jbh list [type]
+#   jbh get <type> <nom> [--to <dossier>]
+#   jbh update <type> <nom> --with <fichier|dossier>
+#   jbh delete <type> <nom>
+#   jbh pull
+# Variables : JBH_TOKEN (obligatoire), JBH_URL (défaut https://jbh.byjulien.com).
+set -eu
+
+die() { echo "jbh : $*" >&2; exit 1; }
+
+[ -n "${JBH_TOKEN:-}" ] || die "JBH_TOKEN est vide : exporte ton jeton."
+url="${JBH_URL:-https://jbh.byjulien.com}"
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+# api MÉTHODE CHEMIN [FICHIER_CORPS] : la réponse va dans $tmp/reponse. Échoue si le statut n'est pas 2xx.
+api() {
+  set -- -s -o "$tmp/reponse" -w '%{http_code}' -X "$1" "$url$2" -H "Authorization: Bearer $JBH_TOKEN" ${3:+--data-binary "@$3" -H 'Content-Type: application/json'}
+  status="$(curl "$@")" || die "le serveur ne répond pas ($url)"
+  case "$status" in
+    2??) ;;
+    *) die "erreur $status : $(jq -r '.error // empty' "$tmp/reponse" 2>/dev/null)" ;;
+  esac
+}
+
+# files_json CHEMIN : écrit dans $tmp/corps le JSON {"files":[...]} d'un fichier ou d'un dossier.
+files_json() {
+  : >"$tmp/liste"
+  if [ -d "$1" ]; then
+    find "$1" -type f | sort | while IFS= read -r file; do
+      jq -n --arg path "${file#"$1"/}" --rawfile content "$file" '{path: $path, content: $content}' >>"$tmp/liste"
+    done
+  elif [ -f "$1" ]; then
+    jq -n --arg path "$(basename "$1")" --rawfile content "$1" '{path: $path, content: $content}' >>"$tmp/liste"
+  else
+    die "introuvable : $1"
+  fi
+  jq -s '{files: .}' "$tmp/liste" >"$tmp/corps"
+}
+
+# write_files DOSSIER : écrit dans DOSSIER les fichiers de $tmp/reponse (un item).
+write_files() {
+  jq -r '.files[].path' "$tmp/reponse" | while IFS= read -r path; do
+    mkdir -p "$(dirname "$1/$path")"
+    jq -j --arg path "$path" '.files[] | select(.path == $path) | .content' "$tmp/reponse" >"$1/$path"
+  done
+}
+
+# backup CIBLE : met de côté un fichier ou dossier local que jbh ne connaît pas encore.
+backup() {
+  [ -e "$1" ] || return 0
+  mkdir -p "$HOME/.config/jbh/sauvegardes"
+  mv "$1" "$HOME/.config/jbh/sauvegardes/$stamp$(printf %s "$1" | tr / _)"
+}
+
+cmd="${1:-}"
+[ $# -gt 0 ] && shift
+
+case "$cmd" in
+  list)
+    api GET "/items${1:+?type=$1}"
+    jq -r '.items[] | "\(.type) \(.name) v\(.version)"' "$tmp/reponse"
+    ;;
+  get)
+    [ $# -ge 2 ] || die "usage : jbh get <type> <nom> [--to <dossier>]"
+    api GET "/items/$1/$2"
+    if [ "${3:-}" = "--to" ]; then
+      [ -n "${4:-}" ] || die "--to demande un dossier"
+      write_files "$4"
+    elif [ "$(jq '.files | length' "$tmp/reponse")" -eq 1 ]; then
+      jq -j '.files[0].content' "$tmp/reponse"
+    else
+      jq -r '.files[] | "== \(.path) ==\n\(.content)"' "$tmp/reponse"
+    fi
+    ;;
+  update)
+    [ $# -eq 4 ] && [ "$3" = "--with" ] || die "usage : jbh update <type> <nom> --with <fichier|dossier>"
+    files_json "$4"
+    api PUT "/items/$1/$2" "$tmp/corps"
+    jq -r '"\(.type)/\(.name) v\(.version)"' "$tmp/reponse"
+    ;;
+  delete)
+    [ $# -eq 2 ] || die "usage : jbh delete <type> <nom>"
+    api DELETE "/items/$1/$2"
+    echo "supprimé : $1/$2"
+    ;;
+  pull)
+    state="$HOME/.config/jbh/versions"
+    mkdir -p "$(dirname "$state")"
+    touch "$state"
+    stamp="$(date +%Y%m%d%H%M%S)"
+    api GET /items
+    jq -r '.items[] | "\(.type) \(.name) \(.version)"' "$tmp/reponse" >"$tmp/items"
+    changed=0
+    while read -r type name version; do
+      [ "$type" = skill ] || { [ "$type" = claude-md ] && [ "$name" = global ]; } || continue
+      known="$(awk -v k="$type $name" '$1 " " $2 == k { print $3 }' "$state")"
+      [ "$known" = "$version" ] && continue
+      api GET "/items/$type/$name"
+      if [ "$type" = skill ]; then
+        for target in "$HOME/.claude/skills/$name" "$HOME/.codex/skills/$name"; do
+          [ -n "$known" ] && rm -rf "$target" || backup "$target"
+          mkdir -p "$target"
+          write_files "$target"
+        done
+      else
+        for target in "$HOME/.claude/CLAUDE.md" "$HOME/.codex/AGENTS.md"; do
+          [ -n "$known" ] || backup "$target"
+          mkdir -p "$(dirname "$target")"
+          jq -j '.files[0].content' "$tmp/reponse" >"$target"
+        done
+      fi
+      { grep -v "^$type $name " "$state" || true; echo "$type $name $version"; } >"$tmp/etat"
+      cp "$tmp/etat" "$state"
+      echo "$type/$name v$version"
+      changed=1
+    done <"$tmp/items"
+    [ "$changed" -eq 1 ] || echo "à jour"
+    ;;
+  *)
+    die "commande inconnue : '$cmd'. Commandes : list, get, update, delete, pull."
+    ;;
+esac
