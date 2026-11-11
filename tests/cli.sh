@@ -62,9 +62,9 @@ est "get --to : sous-dossier" "echo salut" "$(cat "$tmp/sortie/scripts/run.sh" 2
 
 # --- 5. update d'un fichier seul ---------------------------------------------
 
-est "update fichier : création" "claude-md/global v1" "$("$jbh" update claude-md global --with "$tmp/CLAUDE.md")"
-est "get d'un seul fichier : contenu" "# global" "$("$jbh" get claude-md global)"
-est "list claude-md" "claude-md global v1" "$("$jbh" list claude-md)"
+est "update fichier : création" "instructions-md/global v1" "$("$jbh" update instructions-md global --with "$tmp/CLAUDE.md")"
+est "get d'un seul fichier : contenu" "# global" "$("$jbh" get instructions-md global)"
+est "list instructions-md" "instructions-md global v1" "$("$jbh" list instructions-md)"
 
 # --- 6. nouvelle version -----------------------------------------------------
 
@@ -74,7 +74,7 @@ est "update : version 2" "skill/xyz v2" "$("$jbh" update skill xyz --with "$tmp/
 # --- 7. delete ---------------------------------------------------------------
 
 "$jbh" delete skill xyz >/dev/null
-est "list après delete" "claude-md global v1" "$("$jbh" list)"
+est "list après delete" "instructions-md global v1" "$("$jbh" list)"
 
 # --- 8. erreurs --------------------------------------------------------------
 
@@ -101,7 +101,7 @@ pull() { HOME="$home" "$jbh" pull; }
 printf '# un' >"$tmp/skill/SKILL.md"
 "$jbh" update skill xyz --with "$tmp/skill" >/dev/null
 "$jbh" update skill ancien --with "$tmp/skill" >/dev/null
-"$jbh" update claude-md autre --with "$tmp/CLAUDE.md" >/dev/null
+"$jbh" update instructions-md autre --with "$tmp/CLAUDE.md" >/dev/null
 
 pull >"$tmp/pull1" 2>&1; code=$?
 est "pull : succès" 0 "$code"
@@ -110,7 +110,7 @@ est "pull : AGENTS.md pour Codex" "# global" "$(cat "$home/.codex/AGENTS.md" 2>/
 est "pull : skill Claude" "# un" "$(cat "$home/.claude/skills/xyz/SKILL.md" 2>/dev/null)"
 est "pull : sous-dossier Claude" "echo salut" "$(cat "$home/.claude/skills/xyz/scripts/run.sh" 2>/dev/null)"
 est "pull : skill Codex" "# un" "$(cat "$home/.codex/skills/xyz/SKILL.md" 2>/dev/null)"
-est "pull : claude-md autre que global ignoré" "" "$(ls "$home/.claude" "$home/.codex" | grep -i autre)"
+est "pull : instructions-md autre que global ignoré" "" "$(ls "$home/.claude" "$home/.codex" | grep -i autre)"
 est "pull : ancien CLAUDE.md sauvegardé" "# local" "$(cat "$home"/.config/jbh/sauvegardes/*claude_CLAUDE.md 2>/dev/null)"
 est "pull : ancien skill local sauvegardé" "à moi" "$(cat "$home"/.config/jbh/sauvegardes/*claude_skills_ancien/SKILL.md 2>/dev/null)"
 

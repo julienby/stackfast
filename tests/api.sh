@@ -122,8 +122,9 @@ json "liste skill : 1 item" '.items | length' '1'
 json "liste skill : lien de l'item" '.items[0]._links.self.href' '/items/skill/xyz'
 json "liste skill : version courante" '.items[0].version' '2'
 
-req GET '/items?type=claude-md'
-json "liste claude-md : vide" '.items | length' '0'
+req GET '/items?type=instructions-md'
+statut "liste instructions-md" 200
+json "liste instructions-md : vide" '.items | length' '0'
 
 req GET '/items?type=autre'
 statut "filtre : type inconnu" 400

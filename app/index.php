@@ -1,7 +1,7 @@
 <?php
 // jbh : stockage de mon harnais. Un seul fichier, une base SQLite, un jeton.
 
-const TYPES = ['claude-md', 'skill'];
+const TYPES = ['instructions-md', 'skill'];
 
 function reply(int $status, ?array $data = null): never
 {

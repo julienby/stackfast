@@ -96,7 +96,7 @@ case "$cmd" in
     jq -r '.items[] | "\(.type) \(.name) \(.version)"' "$tmp/reponse" >"$tmp/items"
     changed=0
     while read -r type name version; do
-      [ "$type" = skill ] || { [ "$type" = claude-md ] && [ "$name" = global ]; } || continue
+      [ "$type" = skill ] || { [ "$type" = instructions-md ] && [ "$name" = global ]; } || continue
       known="$(awk -v k="$type $name" '$1 " " $2 == k { print $3 }' "$state")"
       [ "$known" = "$version" ] && continue
       api GET "/items/$type/$name"
