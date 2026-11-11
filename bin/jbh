@@ -5,6 +5,11 @@
 #   jbh update <type> <nom> --with <fichier|dossier>
 #   jbh delete <type> <nom>
 #   jbh pull
+# Dans un projet (fichier .jbh à la racine) :
+#   jbh add <type> <nom> [--to <chemin>]
+#   jbh status
+#   jbh sync
+#   jbh remove <type> <nom>
 # Variables : JBH_TOKEN (obligatoire), JBH_URL (défaut https://jbh.byjulien.com).
 set -eu
 
@@ -54,6 +59,61 @@ backup() {
   [ -e "$1" ] || return 0
   mkdir -p "$HOME/.config/jbh/sauvegardes"
   mv "$1" "$HOME/.config/jbh/sauvegardes/$stamp$(printf %s "$1" | tr / _)"
+}
+
+# fetch_to TYPE NOM VERSION DOSSIER : écrit une version (la dernière si VERSION est vide) dans DOSSIER.
+# Un instructions-md devient le fichier "f".
+fetch_to() {
+  api GET "/items/$1/$2${3:+/versions/$3}"
+  rm -rf "$4"
+  mkdir -p "$4"
+  if [ "$1" = skill ]; then write_files "$4"; else jq -j '.files[0].content' "$tmp/reponse" >"$4/f"; fi
+}
+
+# ours_of TYPE DESTINATION : met dans $ours le contenu local, au même format que fetch_to.
+ours_of() {
+  if [ "$1" = skill ]; then
+    ours="$2"
+  else
+    ours="$tmp/ours"
+    rm -rf "$ours"
+    mkdir -p "$ours"
+    if [ -f "$2" ]; then cp "$2" "$ours/f"; fi
+  fi
+}
+
+need_state() { [ -f .jbh ] || die "pas de fichier .jbh ici : lance d'abord 'jbh add'."; }
+
+# latest_of TYPE NOM : version la plus récente dans $tmp/items (vide si absent).
+latest_of() { awk -v k="$1 $2" '$1 " " $2 == k { print $3 }' "$tmp/items"; }
+
+# merge_dirs DEST : fusion à trois : $tmp/base (version connue), $tmp/theirs (dernière), $ours (local).
+# Met merged=1 si les deux côtés avaient changé, conflict=1 si des marqueurs sont écrits.
+merge_dirs() {
+  merged=0
+  conflict=0
+  mkdir -p "$ours"
+  { (cd "$tmp/base" && find . -type f); (cd "$tmp/theirs" && find . -type f); } | sort -u >"$tmp/chemins"
+  while IFS= read -r p; do
+    b="$tmp/base/$p"; t="$tmp/theirs/$p"; o="$ours/$p"
+    shown="$1"; [ "$type" = skill ] && shown="$1/${p#./}"
+    if [ ! -f "$t" ]; then
+      if [ -f "$o" ] && cmp -s "$b" "$o"; then rm -f "$o"; fi
+    elif [ ! -f "$o" ]; then
+      if [ ! -f "$b" ] || ! cmp -s "$b" "$t"; then mkdir -p "$(dirname "$o")"; cp "$t" "$o"; fi
+    elif cmp -s "$t" "$o"; then
+      :
+    elif [ -f "$b" ] && cmp -s "$b" "$o"; then
+      cp "$t" "$o"
+    else
+      [ -f "$b" ] || { : >"$tmp/vide"; b="$tmp/vide"; }
+      rc=0
+      diff3 -m -L local -L base -L jbh "$o" "$b" "$t" >"$tmp/fusion" || rc=$?
+      [ "$rc" -le 1 ] || die "diff3 a échoué sur $shown"
+      cp "$tmp/fusion" "$o"
+      if [ "$rc" -eq 0 ]; then echo "fusionné : $shown"; merged=1; else echo "CONFLIT : $shown"; conflict=1; fi
+    fi
+  done <"$tmp/chemins"
 }
 
 cmd="${1:-}"
@@ -120,7 +180,102 @@ case "$cmd" in
     done <"$tmp/items"
     [ "$changed" -eq 1 ] || echo "à jour"
     ;;
+  add)
+    [ $# -ge 2 ] || die "usage : jbh add <type> <nom> [--to <chemin>]"
+    type="$1"; name="$2"; shift 2
+    dest=""
+    if [ "${1:-}" = --to ]; then dest="${2:-}"; [ -n "$dest" ] || die "--to demande un chemin"; fi
+    case "$type" in
+      instructions-md) : "${dest:=AGENTS.md}" ;;
+      skill) : "${dest:=.claude/skills/$name}" ;;
+      *) die "type inconnu : $type" ;;
+    esac
+    if [ -f .jbh ] && grep -q "^$type $name " .jbh; then die "déjà ajouté : $type/$name"; fi
+    [ ! -e "$dest" ] || die "existe déjà : $dest"
+    fetch_to "$type" "$name" "" "$tmp/theirs"
+    version="$(jq -r '.version' "$tmp/reponse")"
+    if [ "$type" = skill ]; then
+      mkdir -p "$dest"
+      cp -R "$tmp/theirs/." "$dest/"
+    else
+      mkdir -p "$(dirname "$dest")"
+      cp "$tmp/theirs/f" "$dest"
+      if [ "$(basename "$dest")" = AGENTS.md ] && [ ! -e "$(dirname "$dest")/CLAUDE.md" ]; then
+        echo '@AGENTS.md' >"$(dirname "$dest")/CLAUDE.md"
+      fi
+    fi
+    echo "$type $name $version $dest" >>.jbh
+    echo "ajouté : $type/$name v$version → $dest"
+    ;;
+  status)
+    need_state
+    api GET /items
+    jq -r '.items[] | "\(.type) \(.name) \(.version)"' "$tmp/reponse" >"$tmp/items"
+    while read -r type name version dest; do
+      latest="$(latest_of "$type" "$name")"
+      [ -n "$latest" ] || { echo "$type/$name v$version absent de jbh"; continue; }
+      fetch_to "$type" "$name" "$version" "$tmp/base"
+      ours_of "$type" "$dest"
+      mod=""
+      diff -r -q "$tmp/base" "$ours" >/dev/null 2>&1 || mod=" (modifié en local)"
+      if [ "$latest" != "$version" ]; then echo "$type/$name v$version → v$latest$mod"
+      elif [ -n "$mod" ]; then echo "$type/$name v$version$mod"
+      else echo "$type/$name v$version à jour"; fi
+    done <.jbh
+    ;;
+  sync)
+    need_state
+    api GET /items
+    jq -r '.items[] | "\(.type) \(.name) \(.version)"' "$tmp/reponse" >"$tmp/items"
+    : >"$tmp/nouveau"
+    changed=0
+    any_conflict=0
+    while read -r type name version dest; do
+      latest="$(latest_of "$type" "$name")"
+      if [ -z "$latest" ] || [ "$latest" = "$version" ]; then
+        echo "$type $name $version $dest" >>"$tmp/nouveau"
+        continue
+      fi
+      fetch_to "$type" "$name" "$version" "$tmp/base"
+      fetch_to "$type" "$name" "$latest" "$tmp/theirs"
+      ours_of "$type" "$dest"
+      echo "$type/$name v$latest"
+      merge_dirs "$dest"
+      if [ "$type" != skill ] && [ -f "$ours/f" ]; then
+        mkdir -p "$(dirname "$dest")"
+        cp "$ours/f" "$dest"
+      fi
+      [ "$conflict" -eq 0 ] || any_conflict=1
+      echo "$type $name $latest $dest" >>"$tmp/nouveau"
+      changed=1
+    done <.jbh
+    cp "$tmp/nouveau" .jbh
+    [ "$changed" -eq 1 ] || echo "à jour"
+    [ "$any_conflict" -eq 0 ] || die "des conflits restent : cherche <<<<<<< dans les fichiers."
+    ;;
+  remove)
+    [ $# -eq 2 ] || die "usage : jbh remove <type> <nom>"
+    need_state
+    line="$(grep "^$1 $2 " .jbh)" || die "pas dans .jbh : $1/$2"
+    set -- $line
+    type="$1"; name="$2"; version="$3"; dest="$4"
+    fetch_to "$type" "$name" "$version" "$tmp/base"
+    ours_of "$type" "$dest"
+    if [ "$type" = skill ]; then
+      (cd "$tmp/base" && find . -type f) | while IFS= read -r p; do
+        if [ -f "$ours/$p" ] && cmp -s "$tmp/base/$p" "$ours/$p"; then rm -f "$ours/$p"; else echo "gardé : $dest/${p#./}"; fi
+      done
+      [ ! -d "$dest" ] || find "$dest" -depth -type d -empty -delete
+    elif [ -f "$dest" ] && cmp -s "$tmp/base/f" "$dest"; then
+      rm -f "$dest"
+    else
+      echo "gardé : $dest"
+    fi
+    { grep -v "^$type $name " .jbh || true; } >"$tmp/nouveau"
+    cp "$tmp/nouveau" .jbh
+    echo "retiré : $type/$name"
+    ;;
   *)
-    die "commande inconnue : '$cmd'. Commandes : list, get, update, delete, pull."
+    die "commande inconnue : '$cmd'. Commandes : list, get, update, delete, pull, add, status, sync, remove."
     ;;
 esac
