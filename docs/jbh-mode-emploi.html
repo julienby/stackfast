@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>jbh : mode d'emploi</title>
+<style>
+  *, ::before, ::after { box-sizing: border-box; min-width: 0; }
+  :root {
+    color-scheme: light dark;
+    --fond: light-dark(oklch(98.5% 0 none), oklch(19% 0 none));
+    --carte: light-dark(oklch(100% 0 none), oklch(24% 0 none));
+    --texte: light-dark(oklch(22% 0 none), oklch(92% 0 none));
+    --discret: light-dark(oklch(46% 0 none), oklch(72% 0 none));
+    --trait: light-dark(oklch(89% 0 none), oklch(33% 0 none));
+    --accent: light-dark(oklch(48% 0.16 255), oklch(76% 0.12 255));
+    --accent-fond: color-mix(in oklch, var(--accent) 10%, var(--fond));
+    --ok: light-dark(oklch(45% 0.12 150), oklch(78% 0.13 150));
+    --ok-fond: color-mix(in oklch, var(--ok) 10%, var(--fond));
+    --attention: light-dark(oklch(50% 0.13 70), oklch(80% 0.12 80));
+    --attention-fond: color-mix(in oklch, var(--attention) 12%, var(--fond));
+    --code-fond: light-dark(oklch(95% 0 none), oklch(15% 0 none));
+    scrollbar-gutter: stable;
+    scroll-padding-block-start: 1rem;
+    text-wrap: pretty;
+    overflow-wrap: break-word;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 { text-wrap: balance; line-height: 1.2; }
+  body {
+    margin: 0;
+    padding-inline: max(1rem, calc((100% - 46rem) / 2));
+    padding-block: 2rem 4rem;
+    background: var(--fond);
+    color: var(--texte);
+    font: 1.0625rem/1.65 system-ui, sans-serif;
+  }
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+  main > * + * { margin-block-start: 1rem; }
+  p, ul, ol, pre { margin: 0; }
+  h1 { margin: 0; font-size: clamp(1.75rem, 1.2rem + 2vw, 2.5rem); }
+  h2 { margin-block: 3rem 0; padding-block-start: 1.5rem; border-block-start: 1px solid var(--trait); font-size: 1.5rem; }
+  h3 { margin-block: 1.5rem 0; font-size: 1.125rem; }
+  .intro { color: var(--discret); font-size: 1.25rem; }
+  ul, ol { padding-inline-start: 1.5rem; }
+  li + li { margin-block-start: 0.4rem; }
+  code { padding: 0.1em 0.35em; background: var(--code-fond); border-radius: 0.25rem; font: 0.9em ui-monospace, monospace; }
+  pre { padding: 1rem; overflow: auto; background: var(--code-fond); border-radius: 0.5rem; font: 0.9rem/1.5 ui-monospace, monospace; }
+  pre code { padding: 0; background: none; }
+  .sortie { color: var(--discret); }
+
+  nav { margin-block-start: 1.5rem; padding: 1rem 1.25rem; background: var(--carte); border: 1px solid var(--trait); border-radius: 0.5rem; }
+  nav ol { columns: 2 14rem; }
+
+  .note, .astuce, .piege { padding: 0.75rem 1rem; border-inline-start: 4px solid; border-radius: 0.25rem; }
+  .note { border-color: var(--accent); background: var(--accent-fond); }
+  .astuce { border-color: var(--ok); background: var(--ok-fond); }
+  .piege { border-color: var(--attention); background: var(--attention-fond); }
+  .note::before, .astuce::before, .piege::before { display: block; font-weight: 700; }
+  .note::before { content: "À retenir"; }
+  .astuce::before { content: "Astuce"; }
+  .piege::before { content: "Attention"; }
+
+  .schema { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: stretch; }
+  .schema > div { flex: 1 1 11rem; padding: 0.75rem 1rem; background: var(--carte); border: 1px solid var(--trait); border-radius: 0.5rem; }
+  .schema > div strong { display: block; }
+  .schema > div span { color: var(--discret); font-size: 0.9375rem; }
+  .schema > .fleche { flex: 0 0 auto; align-self: center; padding: 0; background: none; border: 0; color: var(--discret); font-size: 1.5rem; }
+
+  .etapes { counter-reset: etape; padding: 0; list-style: none; }
+  .etapes > li { counter-increment: etape; display: grid; grid-template-columns: 2.25rem 1fr; gap: 0.25rem 1rem; padding-block: 1rem; border-block-end: 1px solid var(--trait); }
+  .etapes > li::before { content: counter(etape); grid-row: 1 / span 3; inline-size: 2.25rem; block-size: 2.25rem; display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: var(--fond); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .etapes > li > * { grid-column: 2; }
+
+  table { inline-size: 100%; border-collapse: collapse; font-size: 0.9375rem; }
+  th, td { padding: 0.5rem 0.75rem; border-block-end: 1px solid var(--trait); text-align: start; vertical-align: top; }
+  th { font-weight: 600; }
+  .defile { overflow-x: auto; }
+</style>
+
+<body>
+<main>
+  <h1>jbh : mode d'emploi</h1>
+  <p class="intro">jbh range les fichiers qui règlent ton assistant IA. Tu les écris une fois. Tu les reprends dans chaque projet.</p>
+
+  <nav aria-label="Sommaire">
+    <ol>
+      <li><a href="#idee">L'idée en une minute</a></li>
+      <li><a href="#vocabulaire">Les mots à connaître</a></li>
+      <li><a href="#demarrer">Démarrer</a></li>
+      <li><a href="#stocker">Stocker un fichier</a></li>
+      <li><a href="#global">Régler ton poste : pull</a></li>
+      <li><a href="#projet">Utiliser dans un projet</a></li>
+      <li><a href="#fusion">Quand local et distant diffèrent</a></li>
+      <li><a href="#web">La page web</a></li>
+      <li><a href="#recettes">Recettes rapides</a></li>
+      <li><a href="#problemes">Si ça ne marche pas</a></li>
+    </ol>
+  </nav>
+
+  <h2 id="idee">1. L'idée en une minute</h2>
+  <p>Ton assistant IA lit des fichiers texte pour savoir comment travailler avec toi. Ce sont des fichiers <code>.md</code> : des consignes, des compétences.</p>
+  <p>Sans jbh, ces fichiers sont copiés à la main d'un projet à l'autre. Ils se perdent. Ils divergent. Tu ne sais plus lequel est le bon.</p>
+  <p>Avec jbh, il existe <strong>une seule source</strong>. Chaque projet prend sa copie depuis cette source. Quand la source change, tu mets à jour la copie.</p>
+
+  <div class="schema" role="img" aria-label="Schéma : jbh envoie les fichiers vers ton poste et vers tes projets">
+    <div><strong>jbh</strong><span>la source, avec l'historique de chaque version</span></div>
+    <div class="fleche" aria-hidden="true">→</div>
+    <div><strong>Ton poste</strong><span><code>~/.claude</code> et <code>~/.codex</code></span></div>
+    <div class="fleche" aria-hidden="true">+</div>
+    <div><strong>Tes projets</strong><span><code>AGENTS.md</code> et <code>.claude/skills/</code></span></div>
+  </div>
+
+  <p class="note">L'IA ne parle jamais à jbh. L'IA lit des fichiers locaux, comme d'habitude. jbh, lui, met ces fichiers à jour. Ainsi, tu peux changer de fournisseur d'IA sans perdre tes réglages.</p>
+
+  <h2 id="vocabulaire">2. Les mots à connaître</h2>
+  <div class="defile">
+    <table>
+      <thead><tr><th>Mot</th><th>Sens</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Ressource</th><td>Un élément rangé dans jbh. Elle a un <strong>type</strong> et un <strong>nom</strong>, par exemple <code>skill/explain</code>.</td></tr>
+        <tr><th scope="row"><code>instructions-md</code></th><td>Un type. C'est un fichier de consignes : <code>AGENTS.md</code> ou <code>CLAUDE.md</code>.</td></tr>
+        <tr><th scope="row"><code>skill</code></th><td>Un type. C'est un <strong>dossier</strong> avec un <code>SKILL.md</code> et d'autres fichiers si besoin.</td></tr>
+        <tr><th scope="row">Version</th><td>Chaque envoi crée une nouvelle version : v1, v2, v3. Les anciennes restent. Rien ne se perd.</td></tr>
+        <tr><th scope="row">Jeton</th><td>Ton mot de passe pour jbh. Sans lui, personne ne lit rien.</td></tr>
+        <tr><th scope="row"><code>.jbh</code></th><td>Un petit fichier à la racine d'un projet. Il note ce que le projet a pris dans jbh, et à quelle version.</td></tr>
+        <tr><th scope="row">Fusion</th><td>Mélanger tes changements locaux et les changements de jbh, sans rien écraser.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="demarrer">3. Démarrer</h2>
+  <p>jbh a deux parties : un <strong>serveur</strong> (l'API) et un <strong>client</strong> (la commande <code>jbh</code>).</p>
+
+  <h3>Ce qu'il te faut</h3>
+  <ul>
+    <li><code>sh</code>, <code>curl</code> et <code>jq</code> pour le client. Pour <code>jq</code> : <code>sudo apt install jq</code>.</li>
+    <li><code>diff3</code> pour la fusion. Il vient avec <code>diffutils</code>, déjà présent sur la plupart des systèmes.</li>
+    <li>PHP 8.3 avec <code>pdo_sqlite</code>, seulement pour lancer le serveur toi-même.</li>
+  </ul>
+
+  <h3>Lancer un serveur local pour essayer</h3>
+  <p>Le déploiement sur <code>jbh.byjulien.com</code> n'est pas encore fait. En attendant, lance le serveur sur ta machine. Dans le dossier du repo :</p>
+<pre><code>export JBH_TOKEN="un-mot-de-passe-long-que-tu-choisis"
+export JBH_DB="$HOME/.local/share/jbh.sqlite"
+php -S 127.0.0.1:8080 app/index.php</code></pre>
+  <p>Laisse ce terminal ouvert. Le serveur tourne tant qu'il reste ouvert.</p>
+
+  <h3>Régler le client</h3>
+  <p>Dans un <strong>autre</strong> terminal :</p>
+<pre><code>export JBH_TOKEN="un-mot-de-passe-long-que-tu-choisis"
+export JBH_URL="http://127.0.0.1:8080"
+export PATH="$PWD/bin:$PATH"
+
+jbh list</code></pre>
+  <p>Si la liste est vide et sans erreur, tout fonctionne.</p>
+
+  <p class="piege">Le jeton doit être le même des deux côtés. Ne l'écris pas dans un fichier que tu publies. Ne le mets pas dans Git.</p>
+
+  <h2 id="stocker">4. Stocker un fichier</h2>
+  <p>Exemple : tu as un fichier de consignes pour tes projets PHP.</p>
+
+  <ol class="etapes">
+    <li>
+      <strong>Écris le fichier</strong>
+      <p>Crée <code>php.md</code> avec quelques lignes de consignes.</p>
+    </li>
+    <li>
+      <strong>Envoie-le</strong>
+<pre><code>jbh update instructions-md web-php --with php.md
+<span class="sortie">instructions-md/web-php v1</span></code></pre>
+      <p>Lis la commande à voix haute : « mets à jour la ressource de type <em>instructions-md</em> qui s'appelle <em>web-php</em>, avec ce fichier ».</p>
+    </li>
+    <li>
+      <strong>Vérifie</strong>
+<pre><code>jbh list
+<span class="sortie">instructions-md web-php v1</span></code></pre>
+    </li>
+    <li>
+      <strong>Modifie, puis renvoie</strong>
+      <p>Change <code>php.md</code>. Relance la même commande <code>update</code>. La ressource passe en <strong>v2</strong>. La v1 reste dans l'historique.</p>
+    </li>
+  </ol>
+
+  <h3>Un skill est un dossier</h3>
+<pre><code>jbh update skill explain --with ./explain/</code></pre>
+  <p>Tous les fichiers du dossier partent ensemble. Ils forment une seule version.</p>
+
+  <h3>Les autres commandes de base</h3>
+  <div class="defile">
+    <table>
+      <thead><tr><th>Commande</th><th>Effet</th></tr></thead>
+      <tbody>
+        <tr><td><code>jbh list [type]</code></td><td>Montre les ressources, avec leur dernière version.</td></tr>
+        <tr><td><code>jbh get &lt;type&gt; &lt;nom&gt; [--to dossier]</code></td><td>Lit une ressource. Avec <code>--to</code>, écrit les fichiers dans ce dossier.</td></tr>
+        <tr><td><code>jbh update &lt;type&gt; &lt;nom&gt; --with &lt;fichier|dossier&gt;</code></td><td>Crée ou met à jour. Chaque appel ajoute une version.</td></tr>
+        <tr><td><code>jbh delete &lt;type&gt; &lt;nom&gt;</code></td><td>Supprime la ressource <strong>et tout son historique</strong>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="piege"><code>delete</code> ne se rattrape pas. L'historique part avec la ressource.</p>
+
+  <h2 id="global">5. Régler ton poste : <code>pull</code></h2>
+  <p>Ton poste a des réglages <strong>pour tous tes projets</strong> : ton <code>CLAUDE.md</code> global et tes skills personnels. <code>pull</code> les installe.</p>
+<pre><code>jbh pull</code></pre>
+  <p>La commande écrit dans <code>~/.claude/</code> et <code>~/.codex/</code>. Elle prend tous les skills et la ressource <code>instructions-md/global</code>. Ensuite, elle n'a plus besoin du réseau : l'IA lit les fichiers locaux.</p>
+
+  <p class="astuce">Avant d'écraser un fichier, <code>pull</code> en garde une copie dans <code>~/.config/jbh/sauvegardes/</code>. Tu peux donc toujours revenir en arrière.</p>
+
+  <h2 id="projet">6. Utiliser dans un projet</h2>
+  <p><code>pull</code> règle ton poste. Pour un <strong>projet précis</strong>, tu choisis ce qu'il prend. Place-toi à la racine du projet.</p>
+
+  <ol class="etapes">
+    <li>
+      <strong>Ajoute une ressource</strong>
+<pre><code>cd mon-projet
+jbh add instructions-md web-php
+<span class="sortie">ajouté : instructions-md/web-php v1 → AGENTS.md</span></code></pre>
+      <p>jbh écrit <code>AGENTS.md</code>. Il crée aussi un <code>CLAUDE.md</code> qui contient <code>@AGENTS.md</code>. Claude et Codex lisent ainsi le même texte.</p>
+    </li>
+    <li>
+      <strong>Ajoute un skill</strong>
+<pre><code>jbh add skill explain
+<span class="sortie">ajouté : skill/explain v1 → .claude/skills/explain</span></code></pre>
+    </li>
+    <li>
+      <strong>Choisis un autre emplacement si besoin</strong>
+<pre><code>jbh add instructions-md api --to app/AGENTS.md</code></pre>
+      <p>Utile quand une partie du projet a ses propres consignes, par exemple le dossier <code>app/</code>.</p>
+    </li>
+    <li>
+      <strong>Regarde l'état</strong>
+<pre><code>jbh status
+<span class="sortie">instructions-md/web-php v1 à jour
+skill/explain v1 → v2</span></code></pre>
+      <p>Le sens des lignes est dans le tableau plus bas.</p>
+    </li>
+    <li>
+      <strong>Mets à jour</strong>
+<pre><code>jbh sync</code></pre>
+    </li>
+    <li>
+      <strong>Retire une ressource</strong>
+<pre><code>jbh remove skill explain</code></pre>
+    </li>
+  </ol>
+
+  <h3>Lire <code>jbh status</code></h3>
+  <div class="defile">
+    <table>
+      <thead><tr><th>Ligne</th><th>Sens</th></tr></thead>
+      <tbody>
+        <tr><td><code>… v1 à jour</code></td><td>Tu as la dernière version. Rien à faire.</td></tr>
+        <tr><td><code>… v1 → v2</code></td><td>jbh a une version plus récente. Lance <code>jbh sync</code>.</td></tr>
+        <tr><td><code>… v1 (modifié en local)</code></td><td>Tu as changé le fichier dans le projet. jbh ne le touchera pas sans fusion.</td></tr>
+        <tr><td><code>… v1 → v2 (modifié en local)</code></td><td>Les deux ont changé. <code>sync</code> fusionnera.</td></tr>
+        <tr><td><code>… v1 absent de jbh</code></td><td>La ressource a été supprimée dans jbh.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Le fichier <code>.jbh</code></h3>
+  <p>Il vit à la racine du projet. Il contient une ligne par ressource : type, nom, version, destination.</p>
+<pre><code>instructions-md web-php 2 AGENTS.md
+skill explain 1 .claude/skills/explain</code></pre>
+  <p class="note">Mets <code>.jbh</code> dans Git. Ainsi, toute l'équipe voit quelles versions le projet utilise. Lance les commandes <code>jbh</code> depuis la racine : jbh ne cherche pas <code>.jbh</code> dans les dossiers parents.</p>
+
+  <h2 id="fusion">7. Quand local et distant diffèrent</h2>
+  <p>C'est le cas qui fait peur : tu as ajouté une ligne utile dans le projet, et jbh a une nouvelle version. Qui gagne ?</p>
+  <p><strong>Personne ne gagne : jbh fusionne.</strong> Il compare trois textes :</p>
+  <ul>
+    <li>la <strong>base</strong> : la version que tu avais prise au départ (jbh la garde) ;</li>
+    <li>le <strong>local</strong> : ton fichier actuel ;</li>
+    <li>le <strong>distant</strong> : la nouvelle version de jbh.</li>
+  </ul>
+
+  <h3>Exemple pas à pas</h3>
+  <p>La base contient cinq lignes : <code>un deux trois quatre cinq</code>.</p>
+  <ul>
+    <li>Dans ton projet, tu changes la ligne 1 en <code>un local</code>.</li>
+    <li>Dans jbh, tu changes la ligne 5 en <code>cinq distant</code>.</li>
+  </ul>
+<pre><code>jbh sync
+<span class="sortie">fusionné : AGENTS.md</span></code></pre>
+  <p>Résultat : <code>un local deux trois quatre cinq distant</code>. Les deux changements sont là. Ils ne touchaient pas la même ligne.</p>
+
+  <h3>Quand les deux touchent la même ligne</h3>
+  <p>jbh ne peut pas deviner. Il garde ton texte et marque le problème :</p>
+<pre><code>jbh sync
+<span class="sortie">CONFLIT : AGENTS.md</span></code></pre>
+<pre><code>&lt;&lt;&lt;&lt;&lt;&lt;&lt; local
+un local
+||||||| base
+un
+=======
+un distant
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; jbh</code></pre>
+  <p>Ouvre le fichier. Garde ce que tu veux. Supprime les trois lignes de marqueurs. Enregistre. C'est fini.</p>
+
+  <p class="note">Même avec un conflit, <code>.jbh</code> passe à la nouvelle version. La prochaine fusion partira donc de la bonne base. La commande se termine avec une erreur, pour te prévenir.</p>
+
+  <h3>Les règles, en bref</h3>
+  <ul>
+    <li>Tu n'as pas touché au fichier → jbh le remplace par la nouvelle version.</li>
+    <li>Tu as supprimé un fichier sans l'avoir modifié → jbh ne le remet pas.</li>
+    <li>jbh a retiré un fichier d'un skill → il le supprime chez toi, seulement si tu ne l'as pas modifié.</li>
+    <li>Tu as ajouté un fichier à toi dans un dossier de skill → jbh n'y touche jamais.</li>
+  </ul>
+
+  <h2 id="web">8. La page web</h2>
+  <p>La page web sert à <strong>lire</strong>. Elle ne modifie rien.</p>
+  <ol>
+    <li>Ouvre l'adresse du serveur dans ton navigateur, par exemple <code>http://127.0.0.1:8080/</code>.</li>
+    <li>La page demande ton jeton. Colle-le, puis valide.</li>
+    <li>Tu vois la <strong>liste</strong> des ressources. Clique sur l'une d'elles pour voir son <strong>contenu</strong>.</li>
+    <li>Dans le détail, clique sur « historique » pour voir toutes les versions, de la plus récente à la plus ancienne. Clique sur une version pour la relire.</li>
+    <li>« Quitter » efface le jeton du navigateur.</li>
+  </ol>
+  <p class="astuce">Le jeton reste dans l'onglet seulement. Si tu fermes l'onglet, tu dois le saisir à nouveau. C'est voulu : rien ne traîne sur ta machine.</p>
+
+  <h2 id="recettes">9. Recettes rapides</h2>
+  <div class="defile">
+    <table>
+      <thead><tr><th>Je veux…</th><th>Je tape</th></tr></thead>
+      <tbody>
+        <tr><td>Voir ce qui existe</td><td><code>jbh list</code></td></tr>
+        <tr><td>Voir seulement les skills</td><td><code>jbh list skill</code></td></tr>
+        <tr><td>Lire une ressource sans l'installer</td><td><code>jbh get skill explain</code></td></tr>
+        <tr><td>Copier une ressource dans un dossier</td><td><code>jbh get skill explain --to ./copie</code></td></tr>
+        <tr><td>Publier une nouvelle version</td><td><code>jbh update skill explain --with ./explain/</code></td></tr>
+        <tr><td>Installer mes réglages sur un nouveau poste</td><td><code>jbh pull</code></td></tr>
+        <tr><td>Équiper un nouveau projet</td><td><code>jbh add instructions-md web-php</code></td></tr>
+        <tr><td>Savoir si mon projet est en retard</td><td><code>jbh status</code></td></tr>
+        <tr><td>Rattraper le retard</td><td><code>jbh sync</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="problemes">10. Si ça ne marche pas</h2>
+  <div class="defile">
+    <table>
+      <thead><tr><th>Message</th><th>Cause et remède</th></tr></thead>
+      <tbody>
+        <tr><td><code>JBH_TOKEN est vide</code></td><td>Tu n'as pas exporté le jeton dans ce terminal. Relance <code>export JBH_TOKEN=…</code>.</td></tr>
+        <tr><td><code>le serveur ne répond pas</code></td><td>Le serveur est éteint, ou <code>JBH_URL</code> est faux. Vérifie le terminal du serveur.</td></tr>
+        <tr><td><code>erreur 401</code></td><td>Le jeton du client diffère de celui du serveur. Compare les deux.</td></tr>
+        <tr><td><code>erreur 404 : item inconnu</code> ou <code>introuvable</code></td><td>Le type ou le nom est faux. Regarde <code>jbh list</code>.</td></tr>
+        <tr><td><code>pas de fichier .jbh ici</code></td><td>Tu n'es pas à la racine du projet, ou tu n'as jamais lancé <code>jbh add</code>.</td></tr>
+        <tr><td><code>des conflits restent</code></td><td>Cherche <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code> dans tes fichiers, puis règle chaque cas (voir la partie 7).</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="note">Le nom d'une ressource ne contient que des lettres, des chiffres, le point, le tiret et le souligné. Il commence par une lettre ou un chiffre.</p>
+</main>
+</body>
+</html>
