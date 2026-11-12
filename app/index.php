@@ -173,6 +173,14 @@ if ($token === '' || $db_file === '') {
     fail(500, 'JBH_TOKEN et JBH_DB sont obligatoires');
 }
 
+// La page web est publique : elle ne contient aucune donnée. Les données restent derrière le jeton.
+$wants_html = str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'text/html');
+if ($wants_html && $_SERVER['REQUEST_METHOD'] === 'GET' && parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) === '/') {
+    header('Content-Type: text/html; charset=utf-8');
+    readfile(__DIR__ . '/page.html');
+    exit;
+}
+
 $sent = preg_match('/^Bearer (.+)$/', $_SERVER['HTTP_AUTHORIZATION'] ?? '', $found) ? $found[1] : '';
 if (!hash_equals($token, $sent)) {
     header('WWW-Authenticate: Bearer');

@@ -169,6 +169,23 @@ statut "supprimer deux fois" 404
 req GET /items/skill/inconnu
 statut "item inconnu" 404
 
+# --- 10. page web : coquille HTML sans jeton, API toujours protégée ---------
+
+page="$(curl -s -D "$tmp/entetes" -H 'Accept: text/html' "$base/")"
+statut_page="$(head -1 "$tmp/entetes" | tr -d '\r')"
+[ "$statut_page" = "HTTP/1.1 200 OK" ] && ok || bad "page : statut" "HTTP/1.1 200 OK" "$statut_page"
+grep -qi '^content-type: text/html' "$tmp/entetes" && ok || bad "page : type" "text/html" "$(grep -i '^content-type' "$tmp/entetes")"
+case "$page" in *"<title>jbh</title>"*) ok ;; *) bad "page : titre" "<title>jbh</title>" "${page%%
+*}" ;; esac
+case "$page" in *"$token"*) bad "page : ne contient pas le jeton" "absent" "présent" ;; *) ok ;; esac
+
+code="$(curl -s -o /dev/null -w '%{http_code}' -H 'Accept: text/html' "$base/items")"
+[ "$code" = 401 ] && ok || bad "page : /items reste protégé même avec Accept html" 401 "$code"
+code="$(curl -s -o /dev/null -w '%{http_code}' "$base/")"
+[ "$code" = 401 ] && ok || bad "racine sans Accept html : 401" 401 "$code"
+code="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Accept: text/html' "$base/")"
+[ "$code" != 200 ] && ok || bad "page : POST refusé" "pas 200" "$code"
+
 # --- bilan -----------------------------------------------------------------
 
 echo "$pass réussis, $fail échecs"
