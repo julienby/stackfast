@@ -71,9 +71,8 @@
 
 ## Boucle d'amélioration (ce qui fait vivre ces fichiers)
 
-- Tu proposes la Lesson sans attendre que je la demande. Chaque fois que je te corrige ou qu'une vérification échoue
-  sur une erreur évitable, note-le. En fin de tâche, propose en une ligne la règle qui l'aurait empêchée et demande « ok ? ».
-  Je réponds oui ou non. `/retro` est le filet manuel : revue complète si tu as oublié ou en fin de session.
+- Les Lessons se font uniquement à la main, avec `/retro`. Ne propose jamais une Lesson de toi-même.
+  N'écris jamais dans ce fichier sans ma demande explicite.
 - Format : `- YYYY-MM-DD — règle. (erreur observée : ...)`. Sans erreur observée, pas de règle.
   La règle doit être générale : retire les noms de fichiers et de commandes du cas. Si elle ne tient plus sans eux, ne la propose pas.
 - Une Lesson qui revient sur 2 projets remonte ici et sort des locaux. Signale-le.
